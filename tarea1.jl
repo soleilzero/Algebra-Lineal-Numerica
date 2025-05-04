@@ -42,12 +42,6 @@ function QRCGS(A)
     return Q,R
 end
 
-# ╔═╡ 97d583a2-289e-418e-8f0e-d64b91d6bee5
-
-
-# ╔═╡ 0a36b3c9-8c37-44cb-a3f3-e1b28c512965
-
-
 # ╔═╡ 54ba1080-8e48-4df9-8e22-be0235a1177a
 # Gram - Schmidt modificado
 function QRMGS(A)
@@ -74,7 +68,10 @@ Generar una familia de matrices aleatorias de tamaño creciente (por ejemplo, n=
 # ╔═╡ 52189c6b-4273-4223-8107-8b37d9c6418c
 md"Generamos la familia de matrices aleatorias n=10,50,100,200"
 
-# ╔═╡ a470a72b-b92a-4d55-86d4-18b9bb6df93b
+# ╔═╡ 3c3f0f3e-6107-4445-b2da-713e20b64d92
+md"Aplicamos ambos algoritmos a cada una"
+
+# ╔═╡ 0954a5b2-d53e-4eee-b56d-e643208e28f0
 begin
 	A_10 = rand(10,10)
 	A_50 = rand(50,50)
@@ -82,14 +79,23 @@ begin
 	A_200 = rand(200,200)
 end
 
-# ╔═╡ 3c3f0f3e-6107-4445-b2da-713e20b64d92
-md"Aplicamos ambos algoritmos a cada una"
-
 # ╔═╡ 7006cecd-68be-4acf-9bdf-5772abc46a1a
 Q1_10, R1_10 = QRCGS(A_10);
 
 # ╔═╡ 5f30fbe8-718e-47ef-93fa-1c7766b5ee2f
 Q2_10, R2_10 = QRMGS(A_10); 
+
+# ╔═╡ 3614f55e-062f-4275-96fa-ef004f40ce0c
+sizes = [10,50,100,200]
+
+# ╔═╡ 4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
+matrices = [rand(Float16,x,x) for x in sizes]
+
+# ╔═╡ 6cc2206f-e495-4193-b130-c69c84929e2c
+QRCGS(matrices[1])
+
+# ╔═╡ 5f96c99a-1056-4aa5-b7d6-b609e21e54e4
+Q,R = [QRCGS(x) for x in matrices]
 
 # ╔═╡ 07981b90-9c99-4bfe-b4c0-2888e4026f52
 md" ## Mediciones"
@@ -101,15 +107,6 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
  * **Error de ortogonalidad:** ∥Q^TQ−I∥, \| Q^T Q - I \|,
  * **Residuo de la factorización QR:** ∥A−QR∥ o
 """
-
-# ╔═╡ 2e77077f-080e-4569-b971-235210a310c0
-
-
-# ╔═╡ 942a6f1a-bbf0-47a4-ae87-ff58d7c082c8
-
-
-# ╔═╡ d40cb00c-bc31-410e-832f-c22dc03f0a8b
-
 
 # ╔═╡ 3a35586f-e3ac-4db0-8b90-5d2c1992f10b
 display(R1_10);
@@ -129,35 +126,8 @@ opnorm(A_10-Q1_10*R1_10)/opnorm(A_10)
 # ╔═╡ da205278-06c3-4fed-9be6-0c5fee90091a
 opnorm(Q1_10'Q1_10-UniformScaling(1))
 
-# ╔═╡ c109e6a2-d21d-4d6e-9aba-94d1f4eb9e50
-
-
-# ╔═╡ 359b3f4d-eade-4806-8418-e24c79b1aed7
-
-
-# ╔═╡ 77efd232-bf07-426e-a181-7ce6a591b978
-
-
 # ╔═╡ 7a3a41f8-f751-457e-9eac-52d482c47e57
 QRCGS(A_10)
-
-# ╔═╡ 68ee4552-c709-40cd-999b-84d2213feab6
-
-
-# ╔═╡ b354d710-88fd-4cc8-beb0-a16e72f3fcd0
-
-
-# ╔═╡ 1201daf5-ea86-473c-8f21-26986f07fd31
-
-
-# ╔═╡ 7f4701df-fb62-41e5-a4be-4d034aa15c38
-display(Q₁)
-
-# ╔═╡ 19af2302-f88a-45d9-89d2-cb8ce8018d65
-
-
-# ╔═╡ 78caf780-5880-436b-8a9d-d43932aaecb3
-
 
 # ╔═╡ 3d65fc8d-7d4e-4df3-98fd-79389f9f9098
 md"""
@@ -172,18 +142,6 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
  * Residuo de la factorización QR: ∥A−QR∥ o
 
 """
-
-# ╔═╡ 579ee5e2-63cf-4bc2-a7b5-2b1f9cc2aacb
-
-
-# ╔═╡ 2f61fba3-b3ba-45a3-82ea-a3b9c33e234a
-
-
-# ╔═╡ 332b7da5-a081-49ca-9f1b-d1f84fe47e09
-
-
-# ╔═╡ 0260fc43-dc49-4111-9b91-55bf93527087
-
 
 # ╔═╡ 2214203b-5e22-464a-8c5f-d6db90448f93
 md"""
@@ -200,15 +158,6 @@ Representar gráficamente los resultados para cada métrica y discutir:
 ¿Cuál es más rápido? ¿A partir de qué tamaño?
 
 """
-
-# ╔═╡ 992d0aa7-3937-4287-b863-fa1cc08168f7
-
-
-# ╔═╡ 77584f39-fe80-44e0-b3d9-9ca13c140a0a
-
-
-# ╔═╡ 2e1fb9e6-585c-4283-b40c-c8c96030fc3f
-
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -508,44 +457,27 @@ version = "17.4.0+2"
 # ╠═12c18a31-344e-4514-b28e-59e3bfd0b592
 # ╠═b6f1a156-268d-11f0-02c5-939326678b23
 # ╠═8495c828-e82f-4330-aae7-b1fc51972486
-# ╠═97d583a2-289e-418e-8f0e-d64b91d6bee5
-# ╠═0a36b3c9-8c37-44cb-a3f3-e1b28c512965
 # ╠═54ba1080-8e48-4df9-8e22-be0235a1177a
 # ╟─f298da4c-c52c-4150-abee-03a55dae42dc
 # ╟─52189c6b-4273-4223-8107-8b37d9c6418c
-# ╠═a470a72b-b92a-4d55-86d4-18b9bb6df93b
 # ╟─3c3f0f3e-6107-4445-b2da-713e20b64d92
+# ╠═0954a5b2-d53e-4eee-b56d-e643208e28f0
 # ╠═7006cecd-68be-4acf-9bdf-5772abc46a1a
 # ╠═5f30fbe8-718e-47ef-93fa-1c7766b5ee2f
+# ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
+# ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
+# ╠═6cc2206f-e495-4193-b130-c69c84929e2c
+# ╠═5f96c99a-1056-4aa5-b7d6-b609e21e54e4
 # ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
-# ╠═2e77077f-080e-4569-b971-235210a310c0
-# ╠═942a6f1a-bbf0-47a4-ae87-ff58d7c082c8
-# ╠═d40cb00c-bc31-410e-832f-c22dc03f0a8b
 # ╠═3a35586f-e3ac-4db0-8b90-5d2c1992f10b
 # ╠═de2ff265-5986-4868-b17b-dd2208087005
 # ╠═420a77b9-1f81-4f95-8bfc-152bb7df6707
 # ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ecf8c24a-d8ae-4739-80b7-6d1be5cc2c2d
 # ╠═da205278-06c3-4fed-9be6-0c5fee90091a
-# ╠═c109e6a2-d21d-4d6e-9aba-94d1f4eb9e50
-# ╠═359b3f4d-eade-4806-8418-e24c79b1aed7
-# ╠═77efd232-bf07-426e-a181-7ce6a591b978
 # ╠═7a3a41f8-f751-457e-9eac-52d482c47e57
-# ╠═68ee4552-c709-40cd-999b-84d2213feab6
-# ╠═b354d710-88fd-4cc8-beb0-a16e72f3fcd0
-# ╠═1201daf5-ea86-473c-8f21-26986f07fd31
-# ╠═7f4701df-fb62-41e5-a4be-4d034aa15c38
-# ╠═19af2302-f88a-45d9-89d2-cb8ce8018d65
-# ╠═78caf780-5880-436b-8a9d-d43932aaecb3
 # ╠═3d65fc8d-7d4e-4df3-98fd-79389f9f9098
-# ╠═579ee5e2-63cf-4bc2-a7b5-2b1f9cc2aacb
-# ╠═2f61fba3-b3ba-45a3-82ea-a3b9c33e234a
-# ╠═332b7da5-a081-49ca-9f1b-d1f84fe47e09
-# ╠═0260fc43-dc49-4111-9b91-55bf93527087
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
-# ╠═992d0aa7-3937-4287-b863-fa1cc08168f7
-# ╠═77584f39-fe80-44e0-b3d9-9ca13c140a0a
-# ╠═2e1fb9e6-585c-4283-b40c-c8c96030fc3f
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
