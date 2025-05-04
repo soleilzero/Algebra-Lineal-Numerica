@@ -92,10 +92,33 @@ sizes = [10,50,100,200]
 matrices = [rand(Float16,x,x) for x in sizes]
 
 # ╔═╡ 6cc2206f-e495-4193-b130-c69c84929e2c
-QRCGS(matrices[1])
+Q_1, R_1 = QRCGS(matrices[1])
 
-# ╔═╡ 5f96c99a-1056-4aa5-b7d6-b609e21e54e4
-Q,R = [QRCGS(x) for x in matrices]
+# ╔═╡ 471f522d-8db7-45f4-bf55-cc29b28a3743
+results = [QRCGS(x) for x in matrices]
+
+# ╔═╡ d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
+display(results[1][1])
+
+# ╔═╡ b7310764-78cf-480a-b79d-65195da553fb
+begin
+	Q = []; R = [];
+	for i in range(1,size(results)[1])
+		display(results[i][1])
+		
+		push!(Q, results[i][1]);
+		push!(R, results[i][2]);
+	end
+end
+
+# ╔═╡ 79664c3b-ef11-4daa-88b3-09482eae61f3
+display(Q[1])
+
+# ╔═╡ 9c043bb5-269c-46a6-8600-e0e1cf42d640
+display(Q_1)
+
+# ╔═╡ 8ad3dcae-e142-4d0e-a290-f9a1a16eff96
+display(R_1)
 
 # ╔═╡ 07981b90-9c99-4bfe-b4c0-2888e4026f52
 md" ## Mediciones"
@@ -108,20 +131,24 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
  * **Residuo de la factorización QR:** ∥A−QR∥ o
 """
 
-# ╔═╡ 3a35586f-e3ac-4db0-8b90-5d2c1992f10b
-display(R1_10);
-
-# ╔═╡ de2ff265-5986-4868-b17b-dd2208087005
-display(Q1_10);
-
-# ╔═╡ 420a77b9-1f81-4f95-8bfc-152bb7df6707
-
-
 # ╔═╡ fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 md"Residuo relativo de la factorización y residuo de la ortogonalización"
 
-# ╔═╡ ecf8c24a-d8ae-4739-80b7-6d1be5cc2c2d
-opnorm(A_10-Q1_10*R1_10)/opnorm(A_10)
+# ╔═╡ ff0538ab-f3f3-440e-bf79-9a6c533e05c0
+begin
+	absError = []
+	ortError = []
+	for i in range(1,size(matrices)[1])
+		append!(absError, opnorm(matrices[i]-Q[i]*R[i]))
+		append!(ortError, opnorm(Q[i]'Q[i]-UniformScaling(1)))
+	end
+end
+
+# ╔═╡ 7ac89bce-bfc6-4b6a-8ffb-ed28bd7bcc26
+absError
+
+# ╔═╡ 1e89d772-8621-4aef-af60-c0dcda4dbf16
+ortError
 
 # ╔═╡ da205278-06c3-4fed-9be6-0c5fee90091a
 opnorm(Q1_10'Q1_10-UniformScaling(1))
@@ -467,14 +494,18 @@ version = "17.4.0+2"
 # ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
 # ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
 # ╠═6cc2206f-e495-4193-b130-c69c84929e2c
-# ╠═5f96c99a-1056-4aa5-b7d6-b609e21e54e4
+# ╠═471f522d-8db7-45f4-bf55-cc29b28a3743
+# ╠═d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
+# ╠═b7310764-78cf-480a-b79d-65195da553fb
+# ╠═79664c3b-ef11-4daa-88b3-09482eae61f3
+# ╠═9c043bb5-269c-46a6-8600-e0e1cf42d640
+# ╠═8ad3dcae-e142-4d0e-a290-f9a1a16eff96
 # ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
-# ╠═3a35586f-e3ac-4db0-8b90-5d2c1992f10b
-# ╠═de2ff265-5986-4868-b17b-dd2208087005
-# ╠═420a77b9-1f81-4f95-8bfc-152bb7df6707
 # ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
-# ╠═ecf8c24a-d8ae-4739-80b7-6d1be5cc2c2d
+# ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
+# ╠═7ac89bce-bfc6-4b6a-8ffb-ed28bd7bcc26
+# ╠═1e89d772-8621-4aef-af60-c0dcda4dbf16
 # ╠═da205278-06c3-4fed-9be6-0c5fee90091a
 # ╠═7a3a41f8-f751-457e-9eac-52d482c47e57
 # ╠═3d65fc8d-7d4e-4df3-98fd-79389f9f9098
