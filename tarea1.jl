@@ -71,26 +71,30 @@ md"Generamos la familia de matrices aleatorias n=10,50,100,200"
 # ╔═╡ 3c3f0f3e-6107-4445-b2da-713e20b64d92
 md"Aplicamos ambos algoritmos a cada una"
 
+# ╔═╡ c28e6d7b-a290-4521-9866-2fd53add53b6
+function organizeResults(array)
+	Q = []; R = [];
+	for i in range(1,size(array)[1])
+		push!(Q, array[i][1]);
+		push!(R, array[i][2]);
+	end
+	return Q,R
+end
+
 # ╔═╡ 3614f55e-062f-4275-96fa-ef004f40ce0c
-sizes = [10,50,100,200]
+begin
+	sizes = [10,50,100,200]
+	matrices = [rand(Float16,x,x) for x in sizes]
+end
 
 # ╔═╡ 4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
-matrices = [rand(Float16,x,x) for x in sizes]
-
-# ╔═╡ 471f522d-8db7-45f4-bf55-cc29b28a3743
-results = [QRCGS(x) for x in matrices]
+results_QRCGS = [QRCGS(x) for x in matrices]
 
 # ╔═╡ d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
-display(results[1][1])
+results_QRMGS = [QRMGS(x) for x in matrices]
 
-# ╔═╡ b7310764-78cf-480a-b79d-65195da553fb
-begin
-	Q = []; R = [];
-	for i in range(1,size(results)[1])
-		push!(Q, results[i][1]);
-		push!(R, results[i][2]);
-	end
-end
+# ╔═╡ a0436db8-b646-46c8-8ffe-dca523a6d696
+Q_QRCGS,R_QRCGS = organizeResults(results_QRCGS)
 
 # ╔═╡ 07981b90-9c99-4bfe-b4c0-2888e4026f52
 md" ## Mediciones"
@@ -107,20 +111,18 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
 md"Residuo relativo de la factorización y residuo de la ortogonalización"
 
 # ╔═╡ ff0538ab-f3f3-440e-bf79-9a6c533e05c0
-begin
+function defineErrors(matrices,Q,R)
 	absError = []
 	ortError = []
 	for i in range(1,size(matrices)[1])
 		append!(absError, opnorm(matrices[i]-Q[i]*R[i]))
-		append!(ortError, opnorm(Q[i]'Q[i]-UniformScaling(1)))
+		append!(ortError, opnorm(Q_QRCGS[i]'Q[i]-UniformScaling(1)))
 	end
+	return absError, ortError
 end
 
-# ╔═╡ 7ac89bce-bfc6-4b6a-8ffb-ed28bd7bcc26
-absError
-
-# ╔═╡ 1e89d772-8621-4aef-af60-c0dcda4dbf16
-ortError
+# ╔═╡ 334b5f8a-c980-4647-806a-4e12fbe7e02a
+absError, ortError = defineErrors(matrices,Q_QRCGS,R_QRCGS)
 
 # ╔═╡ 7a3a41f8-f751-457e-9eac-52d482c47e57
 # QRCGS(A_10)
@@ -443,17 +445,16 @@ version = "17.4.0+2"
 # ╟─f298da4c-c52c-4150-abee-03a55dae42dc
 # ╟─52189c6b-4273-4223-8107-8b37d9c6418c
 # ╟─3c3f0f3e-6107-4445-b2da-713e20b64d92
+# ╠═c28e6d7b-a290-4521-9866-2fd53add53b6
 # ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
 # ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
-# ╠═471f522d-8db7-45f4-bf55-cc29b28a3743
 # ╠═d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
-# ╠═b7310764-78cf-480a-b79d-65195da553fb
+# ╠═a0436db8-b646-46c8-8ffe-dca523a6d696
 # ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
 # ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
-# ╠═7ac89bce-bfc6-4b6a-8ffb-ed28bd7bcc26
-# ╠═1e89d772-8621-4aef-af60-c0dcda4dbf16
+# ╠═334b5f8a-c980-4647-806a-4e12fbe7e02a
 # ╠═7a3a41f8-f751-457e-9eac-52d482c47e57
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
 # ╟─00000000-0000-0000-0000-000000000001
