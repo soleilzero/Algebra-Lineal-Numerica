@@ -71,28 +71,11 @@ md"Generamos la familia de matrices aleatorias n=10,50,100,200"
 # ╔═╡ 3c3f0f3e-6107-4445-b2da-713e20b64d92
 md"Aplicamos ambos algoritmos a cada una"
 
-# ╔═╡ 0954a5b2-d53e-4eee-b56d-e643208e28f0
-begin
-	A_10 = rand(10,10)
-	A_50 = rand(50,50)
-	A_100 = rand(100,100)
-	A_200 = rand(200,200)
-end
-
-# ╔═╡ 7006cecd-68be-4acf-9bdf-5772abc46a1a
-Q1_10, R1_10 = QRCGS(A_10);
-
-# ╔═╡ 5f30fbe8-718e-47ef-93fa-1c7766b5ee2f
-Q2_10, R2_10 = QRMGS(A_10); 
-
 # ╔═╡ 3614f55e-062f-4275-96fa-ef004f40ce0c
 sizes = [10,50,100,200]
 
 # ╔═╡ 4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
 matrices = [rand(Float16,x,x) for x in sizes]
-
-# ╔═╡ 6cc2206f-e495-4193-b130-c69c84929e2c
-Q_1, R_1 = QRCGS(matrices[1])
 
 # ╔═╡ 471f522d-8db7-45f4-bf55-cc29b28a3743
 results = [QRCGS(x) for x in matrices]
@@ -110,15 +93,6 @@ begin
 		push!(R, results[i][2]);
 	end
 end
-
-# ╔═╡ 79664c3b-ef11-4daa-88b3-09482eae61f3
-display(Q[1])
-
-# ╔═╡ 9c043bb5-269c-46a6-8600-e0e1cf42d640
-display(Q_1)
-
-# ╔═╡ 8ad3dcae-e142-4d0e-a290-f9a1a16eff96
-display(R_1)
 
 # ╔═╡ 07981b90-9c99-4bfe-b4c0-2888e4026f52
 md" ## Mediciones"
@@ -150,25 +124,8 @@ absError
 # ╔═╡ 1e89d772-8621-4aef-af60-c0dcda4dbf16
 ortError
 
-# ╔═╡ da205278-06c3-4fed-9be6-0c5fee90091a
-opnorm(Q1_10'Q1_10-UniformScaling(1))
-
 # ╔═╡ 7a3a41f8-f751-457e-9eac-52d482c47e57
-QRCGS(A_10)
-
-# ╔═╡ 3d65fc8d-7d4e-4df3-98fd-79389f9f9098
-md"""
-## Hi
-Para cada tipo de precisión (Float16, Float32, Float64), medir:
-
-
- * Tiempo de ejecución de cada algoritmo.
-
- * Error de ortogonalidad: ∥Q^TQ−I∥, \| Q^T Q - I \|, 
-
- * Residuo de la factorización QR: ∥A−QR∥ o
-
-"""
+# QRCGS(A_10)
 
 # ╔═╡ 2214203b-5e22-464a-8c5f-d6db90448f93
 md"""
@@ -488,27 +445,18 @@ version = "17.4.0+2"
 # ╟─f298da4c-c52c-4150-abee-03a55dae42dc
 # ╟─52189c6b-4273-4223-8107-8b37d9c6418c
 # ╟─3c3f0f3e-6107-4445-b2da-713e20b64d92
-# ╠═0954a5b2-d53e-4eee-b56d-e643208e28f0
-# ╠═7006cecd-68be-4acf-9bdf-5772abc46a1a
-# ╠═5f30fbe8-718e-47ef-93fa-1c7766b5ee2f
 # ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
 # ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
-# ╠═6cc2206f-e495-4193-b130-c69c84929e2c
 # ╠═471f522d-8db7-45f4-bf55-cc29b28a3743
 # ╠═d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
 # ╠═b7310764-78cf-480a-b79d-65195da553fb
-# ╠═79664c3b-ef11-4daa-88b3-09482eae61f3
-# ╠═9c043bb5-269c-46a6-8600-e0e1cf42d640
-# ╠═8ad3dcae-e142-4d0e-a290-f9a1a16eff96
 # ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
 # ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
 # ╠═7ac89bce-bfc6-4b6a-8ffb-ed28bd7bcc26
 # ╠═1e89d772-8621-4aef-af60-c0dcda4dbf16
-# ╠═da205278-06c3-4fed-9be6-0c5fee90091a
 # ╠═7a3a41f8-f751-457e-9eac-52d482c47e57
-# ╠═3d65fc8d-7d4e-4df3-98fd-79389f9f9098
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
