@@ -84,14 +84,14 @@ end
 # ╔═╡ 3614f55e-062f-4275-96fa-ef004f40ce0c
 begin
 	sizes = [10,50,100,200]
-	matrices = [rand(Float16,x,x) for x in sizes]
+	matrices_Float16 = [rand(Float16,x,x) for x in sizes]
 end
 
 # ╔═╡ 4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
-results_QRCGS = [QRCGS(x) for x in matrices]
+results_QRCGS = [QRCGS(x) for x in matrices_Float16]
 
 # ╔═╡ d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
-results_QRMGS = [QRMGS(x) for x in matrices]
+results_QRMGS = [QRMGS(x) for x in matrices_Float16]
 
 # ╔═╡ a0436db8-b646-46c8-8ffe-dca523a6d696
 Q_QRCGS,R_QRCGS = organizeResults(results_QRCGS)
@@ -122,10 +122,35 @@ function defineErrors(matrices,Q,R)
 end
 
 # ╔═╡ 334b5f8a-c980-4647-806a-4e12fbe7e02a
-absError, ortError = defineErrors(matrices,Q_QRCGS,R_QRCGS)
+absError, ortError = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
 
-# ╔═╡ 7a3a41f8-f751-457e-9eac-52d482c47e57
-# QRCGS(A_10)
+# ╔═╡ 89372931-75c1-42d9-96f6-dbaf33503a0c
+md"Todo en una sola función"
+
+# ╔═╡ a7214db8-dfdb-488e-88a3-a05fcbe184a7
+function hola_QRCGS(matrices, precision = Float64)
+	results = [QRCGS(x) for x in matrices]
+	Q,R = organizeResults(results)
+	return defineErrors(matrices,Q,R)
+end
+
+# ╔═╡ 7fc05d61-8e36-4b89-8f7c-2976ff4944f0
+function hola_QRMGS(matrices, precision = Float64)
+	results = [QRMGS(x) for x in matrices]
+	Q,R = organizeResults(results)
+	return defineErrors(matrices,Q,R)
+end
+
+# ╔═╡ 3a73592b-41db-467c-a3c9-9ef7cd6ccc64
+begin
+	sizes_ = [10,50,100,200]
+	matrices_Float16_ = [rand(Float16,x,x) for x in sizes]
+	Q_16_QRCGS,R_16_QRCGS=hola_QRCGS(matrices_Float16)
+	Q_16_QRMGS,R_16_QRMGS=hola_QRMGS(matrices_Float16)
+end
+
+# ╔═╡ a6a13eaf-9edc-4d00-9970-824c92740238
+Q_16_QRCGS
 
 # ╔═╡ 2214203b-5e22-464a-8c5f-d6db90448f93
 md"""
@@ -455,7 +480,11 @@ version = "17.4.0+2"
 # ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
 # ╠═334b5f8a-c980-4647-806a-4e12fbe7e02a
-# ╠═7a3a41f8-f751-457e-9eac-52d482c47e57
+# ╠═89372931-75c1-42d9-96f6-dbaf33503a0c
+# ╠═a7214db8-dfdb-488e-88a3-a05fcbe184a7
+# ╠═7fc05d61-8e36-4b89-8f7c-2976ff4944f0
+# ╠═3a73592b-41db-467c-a3c9-9ef7cd6ccc64
+# ╠═a6a13eaf-9edc-4d00-9970-824c92740238
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
