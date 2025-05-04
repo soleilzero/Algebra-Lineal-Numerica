@@ -87,8 +87,6 @@ display(results[1][1])
 begin
 	Q = []; R = [];
 	for i in range(1,size(results)[1])
-		display(results[i][1])
-		
 		push!(Q, results[i][1]);
 		push!(R, results[i][2]);
 	end
