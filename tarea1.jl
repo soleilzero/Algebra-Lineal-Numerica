@@ -116,7 +116,7 @@ function defineErrors(matrices,Q,R)
 	ortError = []
 	for i in range(1,size(matrices)[1])
 		append!(absError, opnorm(matrices[i]-Q[i]*R[i]))
-		append!(ortError, opnorm(Q_QRCGS[i]'Q[i]-UniformScaling(1)))
+		append!(ortError, opnorm(Q[i]'Q[i]-UniformScaling(1)))
 	end
 	return absError, ortError
 end
@@ -166,6 +166,31 @@ Representar gráficamente los resultados para cada métrica y discutir:
 
 ¿Cuál es más rápido? ¿A partir de qué tamaño?
 
+"""
+
+# ╔═╡ 2dfb3f3f-b0e8-4e0c-9788-ab4945634641
+A = [
+ 0.378467  0.799976   0.584678;
+ 0.70059   0.826222   0.908991;
+ 0.349043  0.927266   0.161574;
+ 0.995411  0.0340704  0.998302;
+]
+
+# ╔═╡ 7dfed7ef-3105-475e-9087-9914d1867dfe
+display(A)
+
+# ╔═╡ 21b45b3f-bb16-4d27-b27e-6d133269d1cb
+Q1,R1 = QRCGS(A)
+
+# ╔═╡ 72df0cdb-6705-4fed-8538-d1da15ae2927
+hola_QRCGS([A])
+
+# ╔═╡ 3dfe61a0-9a07-4708-abdb-e5192b55fb21
+md"""
+TO DO:
+ * medir tiempo
+ * revisar contra el ejemplo del prof (en proceso, pequeñas dif en Q y R probs por no tener acceso a todo el num) pero grandes diferencias en los errores, a revisar
+ * organizar y llamar todas las veces necesarias las funciones
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -486,5 +511,10 @@ version = "17.4.0+2"
 # ╠═3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 # ╠═a6a13eaf-9edc-4d00-9970-824c92740238
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
+# ╠═2dfb3f3f-b0e8-4e0c-9788-ab4945634641
+# ╠═7dfed7ef-3105-475e-9087-9914d1867dfe
+# ╠═21b45b3f-bb16-4d27-b27e-6d133269d1cb
+# ╠═72df0cdb-6705-4fed-8538-d1da15ae2927
+# ╠═3dfe61a0-9a07-4708-abdb-e5192b55fb21
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
