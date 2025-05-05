@@ -112,7 +112,9 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
 """
 
 # ╔═╡ fcdc43e3-4948-4c6e-97c2-e3de62509dfe
-md"Residuo absoluto de la factorización y residuo de la ortogonalización"
+md" ### Errores
+Medición del residuo absoluto de la factorización y residuo de la ortogonalización
+"
 
 # ╔═╡ ff0538ab-f3f3-440e-bf79-9a6c533e05c0
 function defineErrors(matrices,Q,R)
@@ -125,27 +127,39 @@ function defineErrors(matrices,Q,R)
 	return Dict("absoluteError"=>absError,"ortogonalizationError"=>ortError)
 end
 
-# ╔═╡ b1803674-8ebd-488c-acca-77aac5620662
+# ╔═╡ c0671685-a668-46fd-92d9-c956bfbc763f
+md" ### Tiempo"
+
+# ╔═╡ e6a09ab1-bd05-4425-8761-78144671c9be
+function time_QRCGS(matrices)
+	return [@elapsed QRCGS(x) for x in matrices]
+end
+
+# ╔═╡ a5629bd5-6544-4077-956b-40d6f1e3507d
+function time_QRMGS(matrices)
+	return [@elapsed QRMGS(x) for x in matrices]
+end
+
+# ╔═╡ 47649ae7-fd70-4bc3-b939-7b6defaacd36
 md" ### Ejemplo"
 
 # ╔═╡ 89372931-75c1-42d9-96f6-dbaf33503a0c
 md"""
 ## Workflow
-Todo en una sola función
 """
 
 # ╔═╡ a7214db8-dfdb-488e-88a3-a05fcbe184a7
-function workflow_QRCGS(matrices, precision = Float64)
+function workflow_QRCGS(matrices)
 	results = [QRCGS(x) for x in matrices]
 	Q,R = organizeResults(results)
-	return defineErrors(matrices,Q,R)
+	return defineErrors(matrices,Q,R), time_QRCGS(matrices)
 end
 
 # ╔═╡ 7fc05d61-8e36-4b89-8f7c-2976ff4944f0
-function workflow_QRMGS(matrices, precision = Float64)
+function workflow_QRMGS(matrices)
 	results = [QRMGS(x) for x in matrices]
 	Q,R = organizeResults(results)
-	return defineErrors(matrices,Q,R)
+	return defineErrors(matrices,Q,R), time_QRMGS(matrices)
 end
 
 # ╔═╡ 53619e34-5d68-4188-b577-e720f8b93944
@@ -157,76 +171,129 @@ sizes = [10,50,100,200]
 # ╔═╡ 3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 begin
 	matrices_Float16 = [rand(Float16,x,x) for x in sizes]
-	error_16_QRCGS=workflow_QRCGS(matrices_Float16)
-	error_16_QRMGS=workflow_QRMGS(matrices_Float16)
+	error_16_QRCGS, time_16_QRCGS =workflow_QRCGS(matrices_Float16)
+	error_16_QRMGS, time_16_QRMGS =workflow_QRMGS(matrices_Float16)
 end
 
-# ╔═╡ 334b5f8a-c980-4647-806a-4e12fbe7e02a
-absError, ortError = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
+# ╔═╡ 28c6ccd0-411a-480d-8f33-5496c1999a15
+example_error = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
+
+# ╔═╡ a33fb077-2677-4504-bbaf-a499c8d41f8d
+time_QRCGS(matrices_Float16)
+
+# ╔═╡ 3fe34809-ea01-40bb-b8c9-1e9dba343a39
+workflow_QRCGS(matrices_Float16); workflow_QRMGS(matrices_Float16)
 
 # ╔═╡ 100455cf-d937-4c43-82fc-1a605a1e562c
 begin
 	matrices_Float32 = [rand(Float32,x,x) for x in sizes]
-	error_32_QRCGS=workflow_QRCGS(matrices_Float32)
-	error_32_QRMGS=workflow_QRMGS(matrices_Float32)
+	error_32_QRCGS, time_32_QRCGS =workflow_QRCGS(matrices_Float32)
+	error_32_QRMGS, time_32_QRMGS =workflow_QRMGS(matrices_Float32)
 end
 
 # ╔═╡ a6a13eaf-9edc-4d00-9970-824c92740238
 begin
 	matrices_Float64 = [rand(Float64,x,x) for x in sizes]
-	error_64_QRCGS=workflow_QRCGS(matrices_Float64)
-	error_64_QRMGS=workflow_QRMGS(matrices_Float64)
+	error_64_QRCGS, time_64_QRCGS =workflow_QRCGS(matrices_Float64)
+	error_64_QRMGS, time_64_QRMGS =workflow_QRMGS(matrices_Float64)
 end
 
 # ╔═╡ 2214203b-5e22-464a-8c5f-d6db90448f93
 md"""
-## Análisis de resultados
-Representación gráfica de los resultados para cada métrica
+## Gráfica de resultados
 """
+
+# ╔═╡ 70c63053-b2a3-41fb-95b5-4640212d4cf5
+md" ## Error de factorización"
+
+# ╔═╡ bb1ffc81-0f45-44e8-8f9c-08ba1bf3d803
+md" ### Algoritmo clásico"
 
 # ╔═╡ 0a10b74c-ff89-4475-993b-f67741c8c915
 begin
 	plot(sizes, error_16_QRCGS["absoluteError"], label="GS Float16", lw=2, marker=:circle)
 	plot!(sizes, error_32_QRCGS["absoluteError"], label="GS Float32", lw=2, marker=:circle)
 	plot!(sizes, error_64_QRCGS["absoluteError"], label="GS Float64", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de factorización")
 end
+
+# ╔═╡ ad25b4fc-b34e-4424-9976-80122cce64d0
+md" ### Algoritmo modificado"
 
 # ╔═╡ d11e7631-9600-4c59-80f0-564a6cdd92ce
 begin
 	plot(sizes, error_16_QRMGS["absoluteError"], label="GS Float16", lw=2, marker=:circle)
 	plot!(sizes, error_32_QRMGS["absoluteError"], label="GS Float32", lw=2, marker=:circle)
 	plot!(sizes, error_64_QRMGS["absoluteError"], label="GS Float64", lw=2, marker=:circle)	
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de factorización")
 end
+
+# ╔═╡ ea7bdfd7-2221-4375-be91-26733066b28f
+md" ## Error de ortogonalidad"
+
+# ╔═╡ e596ab5d-f5f6-433b-acc2-085493352cf8
+md" ### Algoritmo clásico"
 
 # ╔═╡ dc80f34f-71f8-4f6b-8a41-ac9c0f72ab99
 begin
-    plot(sizes, error_16_QRCGS["ortogonalizationError"], label="GS Float16", lw=2, marker=:circle)
+	plot(sizes, error_16_QRCGS["ortogonalizationError"], label="GS Float16", lw=2, marker=:circle)
 	plot!(sizes, error_32_QRCGS["ortogonalizationError"], label="GS Float32", lw=2, marker=:circle)
 	plot!(sizes, error_64_QRCGS["ortogonalizationError"], label="GS Float64", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de ortogonalidad")
 end
+
+# ╔═╡ 7275846c-a767-44c8-95e7-24c2c4031e2b
+md" ### Algoritmo modificado"
+
+# ╔═╡ 2aab4c8a-fc4b-497d-8fc9-343600bdfe7a
+begin
+	plot(sizes, error_16_QRMGS["ortogonalizationError"], label="GS Float16", lw=2, marker=:circle)
+		plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GS Float32", lw=2, marker=:circle)
+		plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GS Float64", lw=2, marker=:circle)
+		xlabel!("Tamaño de la matriz")
+		ylabel!("Error de ortogonalidad")
+end
+
+# ╔═╡ 34149410-d115-4a31-8cc4-0644afd2a940
+md" ## Velocidad"
 
 # ╔═╡ 4aa344a4-a802-4593-b0cf-0d4b35babef1
 begin
-	plot(sizes, error_16_QRMGS["ortogonalizationError"], label="GS Float16", lw=2, marker=:circle)
-	plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GS Float32", lw=2, marker=:circle)
-	plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GS Float64", lw=2, marker=:circle)
+	plot(sizes, time_16_QRCGS, label="Clásico Float16", marker=:circle)
+	plot!(sizes, time_32_QRCGS, label="Clásico Float32", marker=:circle)
+	plot!(sizes, time_64_QRCGS, label="Clásico Float64", marker=:circle)
+	plot!(sizes, time_16_QRMGS, label="Modificado Float16", marker=:square)
+	plot!(sizes, time_32_QRMGS, label="Modificado Float32", marker=:square)
+	plot!(sizes, time_64_QRMGS, label="Modificado Float64", marker=:square)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Segundos")
 end
 
 # ╔═╡ 2485f087-ff85-4065-8f2b-35a21a864f65
 md"""
-¿Cuál de los dos algoritmos es más estable numéricamente?
+### Análisis de resultados
 
+> ¿Cuál de los dos algoritmos es más estable numéricamente?
 
-¿Cómo afecta la precisión (Float16, Float32, Float64) a cada algoritmo?
+Podemos decir que el algoritmo modificado es menos estable numéricamente, debido a que...
 
+> ¿Cómo afecta la precisión (Float16, Float32, Float64) a cada algoritmo?
 
-¿Cuál es más rápido? ¿A partir de qué tamaño?
+La precisión no afecta el error de factorización de los algoritmos ni el error de ortogonalidad del algoritmo clásico. En cambio, sí afecta claramente el error de ortogonalidad del algoritmo modificado.
+
+> ¿Cuál es más rápido? ¿A partir de qué tamaño?
+El más rápido es el algoritmo clásico, desde n=100.
 """
+
+# ╔═╡ 2ebcc88c-c421-4595-abf0-b6ef236de52a
+
 
 # ╔═╡ 3dfe61a0-9a07-4708-abdb-e5192b55fb21
 md"""
 ## TO DO:
- * medir tiempo @elapsed o @btime
  * define errors to calculate
  * analyze graphics
  * uso de IA
@@ -1408,24 +1475,38 @@ version = "1.4.1+2"
 # ╠═a0436db8-b646-46c8-8ffe-dca523a6d696
 # ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
-# ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
+# ╟─fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
-# ╟─b1803674-8ebd-488c-acca-77aac5620662
-# ╠═334b5f8a-c980-4647-806a-4e12fbe7e02a
-# ╟─89372931-75c1-42d9-96f6-dbaf33503a0c
+# ╟─c0671685-a668-46fd-92d9-c956bfbc763f
+# ╠═e6a09ab1-bd05-4425-8761-78144671c9be
+# ╠═a5629bd5-6544-4077-956b-40d6f1e3507d
+# ╠═47649ae7-fd70-4bc3-b939-7b6defaacd36
+# ╠═28c6ccd0-411a-480d-8f33-5496c1999a15
+# ╠═a33fb077-2677-4504-bbaf-a499c8d41f8d
+# ╠═89372931-75c1-42d9-96f6-dbaf33503a0c
 # ╠═a7214db8-dfdb-488e-88a3-a05fcbe184a7
 # ╠═7fc05d61-8e36-4b89-8f7c-2976ff4944f0
 # ╠═53619e34-5d68-4188-b577-e720f8b93944
 # ╠═9c752274-6835-43e7-8674-853d4462a80e
+# ╠═3fe34809-ea01-40bb-b8c9-1e9dba343a39
 # ╠═3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 # ╠═100455cf-d937-4c43-82fc-1a605a1e562c
 # ╠═a6a13eaf-9edc-4d00-9970-824c92740238
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
+# ╟─70c63053-b2a3-41fb-95b5-4640212d4cf5
+# ╟─bb1ffc81-0f45-44e8-8f9c-08ba1bf3d803
 # ╠═0a10b74c-ff89-4475-993b-f67741c8c915
+# ╠═ad25b4fc-b34e-4424-9976-80122cce64d0
 # ╠═d11e7631-9600-4c59-80f0-564a6cdd92ce
+# ╟─ea7bdfd7-2221-4375-be91-26733066b28f
+# ╟─e596ab5d-f5f6-433b-acc2-085493352cf8
 # ╠═dc80f34f-71f8-4f6b-8a41-ac9c0f72ab99
+# ╟─7275846c-a767-44c8-95e7-24c2c4031e2b
+# ╠═2aab4c8a-fc4b-497d-8fc9-343600bdfe7a
+# ╠═34149410-d115-4a31-8cc4-0644afd2a940
 # ╠═4aa344a4-a802-4593-b0cf-0d4b35babef1
 # ╠═2485f087-ff85-4065-8f2b-35a21a864f65
+# ╠═2ebcc88c-c421-4595-abf0-b6ef236de52a
 # ╠═3dfe61a0-9a07-4708-abdb-e5192b55fb21
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
