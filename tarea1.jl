@@ -288,15 +288,54 @@ La precisión no afecta el error de factorización de los algoritmos ni el error
 El más rápido es el algoritmo clásico, desde n=100.
 """
 
-# ╔═╡ 2ebcc88c-c421-4595-abf0-b6ef236de52a
+# ╔═╡ 928218bb-2920-4042-91b8-277ab8a5da55
+md"""
+ ## Fuentes externas
+Durante el desarrollo de este proyecto, consulté diversas fuentes externas para comprender y aplicar correctamente conceptos y estructuras del lenguaje de programación Julia. Las principales fuentes utilizadas fueron:
 
+ * Documentación oficial de Julia: Utilicé la documentación oficial para entender y aplicar correctamente las estructuras de datos como arrays y diccionarios. En particular, consulté las secciones sobre arrays y colecciones y estructuras de datos .
+
+ * Foros de discusión y comunidades en línea: Recurrí a plataformas como Stack Overflow para resolver dudas específicas sobre la implementación y manipulación de arrays y diccionarios en Julia. Por ejemplo, consulté discusiones sobre cómo crear un array de unos y cómo iterar sobre un diccionario .
+
+"""
+
+# ╔═╡ 2ebcc88c-c421-4595-abf0-b6ef236de52a
+md"""
+ ### Declaración del uso de inteligencia artificial
+En el desarrollo de este proyecto utilicé el modelo de lenguaje ChatGPT de OpenAI como herramienta de apoyo para resolver dudas conceptuales y técnicas relacionadas con la implementación y análisis de algoritmos numéricos en el lenguaje Julia.
+
+Los usos principales de la IA incluyeron:
+
+ * Consulta sobre sintaxis y estructuras idiomáticas en Julia para la creación de arrays derivados.
+    
+	Prompt utilizado: “¿Cómo puedo definir en Julia un nuevo array a partir de uno existente?”
+    y luego: “Cómo puedo definir dos arrays a partir de uno original? Para que sea equivalente a ‘a,b = func()’”
+    y: “Quiero formar dos nuevos arrays Y y Z a partir de X tal que y[0], z[0] = func(x[0])”
+
+ * Ayuda para aplicar funciones sobre filas o columnas de una matriz, asegurando el comportamiento esperado en contextos donde los datos no eran escalar por escalar.
+
+	Prompt utilizado: “Tengo un problema, el argumento de la función func() está siendo tomado como un vector en lugar de una matriz”
+
+ * Generación de código para graficar errores de ortogonalidad y factorización utilizando Plots.jl.
+
+	Prompt utilizado: “Cómo podría presentarlos en una gráfica?”
+
+ * Asesoría sobre cómo medir la estabilidad numérica de un algoritmo, incluyendo métricas concretas como el error de ortogonalidad y de factorización.
+
+	Prompt utilizado: “Cómo puedo medir la estabilidad numérica del algoritmo?”
+
+ * Captura del tiempo de ejecución de funciones junto con sus resultados.
+
+	Prompt utilizado: “Usando @time en julia, cómo puedo guardar el tiempo demorado y el resultado de la función”
+
+Todas las decisiones de implementación, validación de resultados y análisis de los datos obtenidos fueron realizados personalmente. La inteligencia artificial se utilizó como herramienta complementaria de consulta, y no sustituyó mi juicio académico ni la autoría del trabajo.
+"""
 
 # ╔═╡ 3dfe61a0-9a07-4708-abdb-e5192b55fb21
 md"""
 ## TO DO:
  * define errors to calculate
  * analyze graphics
- * uso de IA
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1506,6 +1545,7 @@ version = "1.4.1+2"
 # ╠═34149410-d115-4a31-8cc4-0644afd2a940
 # ╠═4aa344a4-a802-4593-b0cf-0d4b35babef1
 # ╠═2485f087-ff85-4065-8f2b-35a21a864f65
+# ╟─928218bb-2920-4042-91b8-277ab8a5da55
 # ╠═2ebcc88c-c421-4595-abf0-b6ef236de52a
 # ╠═3dfe61a0-9a07-4708-abdb-e5192b55fb21
 # ╟─00000000-0000-0000-0000-000000000001
