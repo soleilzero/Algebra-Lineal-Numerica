@@ -111,7 +111,7 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
 """
 
 # ╔═╡ fcdc43e3-4948-4c6e-97c2-e3de62509dfe
-md"Residuo relativo de la factorización y residuo de la ortogonalización"
+md"Residuo absoluto de la factorización y residuo de la ortogonalización"
 
 # ╔═╡ ff0538ab-f3f3-440e-bf79-9a6c533e05c0
 function defineErrors(matrices,Q,R)
@@ -121,7 +121,7 @@ function defineErrors(matrices,Q,R)
 		append!(absError, opnorm(matrices[i]-Q[i]*R[i]))
 		append!(ortError, opnorm(Q[i]'Q[i]-UniformScaling(1)))
 	end
-	return absError, ortError
+	return Dict("absoluteError"=>absError,"ortogonalizationError"=>ortError)
 end
 
 # ╔═╡ b1803674-8ebd-488c-acca-77aac5620662
@@ -156,8 +156,8 @@ sizes = [10,50,100,200]
 # ╔═╡ 3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 begin
 	matrices_Float16 = [rand(Float16,x,x) for x in sizes]
-	Q_16_QRCGS,R_16_QRCGS=workflow_QRCGS(matrices_Float16)
-	Q_16_QRMGS,R_16_QRMGS=workflow_QRMGS(matrices_Float16)
+	error_16_QRCGS=workflow_QRCGS(matrices_Float16)
+	error_16_QRMGS=workflow_QRMGS(matrices_Float16)
 end
 
 # ╔═╡ 334b5f8a-c980-4647-806a-4e12fbe7e02a
@@ -166,20 +166,20 @@ absError, ortError = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
 # ╔═╡ 100455cf-d937-4c43-82fc-1a605a1e562c
 begin
 	matrices_Float32 = [rand(Float32,x,x) for x in sizes]
-	Q_32_QRCGS,R_32_QRCGS=workflow_QRCGS(matrices_Float32)
-	Q_32_QRMGS,R_32_QRMGS=workflow_QRMGS(matrices_Float32)
+	error_32_QRCGS=workflow_QRCGS(matrices_Float32)
+	error_32_QRMGS=workflow_QRMGS(matrices_Float32)
 end
 
 # ╔═╡ a6a13eaf-9edc-4d00-9970-824c92740238
 begin
 	matrices_Float64 = [rand(Float64,x,x) for x in sizes]
-	Q_64_QRCGS,R_64_QRCGS=workflow_QRCGS(matrices_Float64)
-	Q_64_QRMGS,R_64_QRMGS=workflow_QRMGS(matrices_Float64)
+	error_64_QRCGS=workflow_QRCGS(matrices_Float64)
+	error_64_QRMGS=workflow_QRMGS(matrices_Float64)
 end
 
 # ╔═╡ 2214203b-5e22-464a-8c5f-d6db90448f93
 md"""
-## Hi
+## Análisis de resultados
 Representar gráficamente los resultados para cada métrica y discutir:
 
 
@@ -195,9 +195,13 @@ Representar gráficamente los resultados para cada métrica y discutir:
 
 # ╔═╡ 3dfe61a0-9a07-4708-abdb-e5192b55fb21
 md"""
-TO DO:
- * medir tiempo
- * organizar y llamar todas las veces necesarias las funciones
+## TO DO:
+ * medir tiempo @elapsed o @btime
+ * fix bug, return of workflow is error, not Q/R
+ * define errors to calculate
+ * add graphics X
+ * analyze graphics
+ * uso de IA
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -206,10 +210,6 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 HypertextLiteral = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
-
-[compat]
-HypertextLiteral = "~0.9.5"
-PlutoUI = "~0.7.62"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -218,7 +218,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "0d161adb749e5cfe6ab3e368a99f79866f3294a3"
+project_hash = "dfd4161274ea54269ab89a61ae33ab2f7cdb7eef"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
