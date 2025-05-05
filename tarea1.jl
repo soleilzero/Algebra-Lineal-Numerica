@@ -276,7 +276,7 @@ end
 md"""
 ### Análisis de resultados
 
-Este análisis está basado en las gráficas anteriores. Estas pueden cambiar cada vez
+Este análisis está basado en las 3 diferentes ejecuciones realizadas de cada algoritmo. Por lo cual, sus conclusiones no son totalmente fiables. 
 
 > ¿Cuál de los dos algoritmos es más estable numéricamente?
 
@@ -333,13 +333,6 @@ Los usos principales de la IA incluyeron:
 	Prompt utilizado: “Usando @time en julia, cómo puedo guardar el tiempo demorado y el resultado de la función”
 
 Todas las decisiones de implementación, validación de resultados y análisis de los datos obtenidos fueron realizados personalmente. La inteligencia artificial se utilizó como herramienta complementaria de consulta, y no sustituyó mi juicio académico ni la autoría del trabajo.
-"""
-
-# ╔═╡ 3dfe61a0-9a07-4708-abdb-e5192b55fb21
-md"""
-## TO DO:
- * define errors to calculate
- * analyze graphics
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1551,6 +1544,5 @@ version = "1.4.1+2"
 # ╠═2485f087-ff85-4065-8f2b-35a21a864f65
 # ╠═928218bb-2920-4042-91b8-277ab8a5da55
 # ╠═2ebcc88c-c421-4595-abf0-b6ef236de52a
-# ╠═3dfe61a0-9a07-4708-abdb-e5192b55fb21
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
