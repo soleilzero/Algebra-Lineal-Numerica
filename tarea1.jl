@@ -81,17 +81,20 @@ function organizeResults(array)
 	return Q,R
 end
 
+# ╔═╡ 6fe3c94f-76e2-41df-8409-5ddfd33d6150
+md" ### Ejemplo"
+
 # ╔═╡ 3614f55e-062f-4275-96fa-ef004f40ce0c
 begin
-	sizes = [10,50,100,200]
-	matrices_Float16 = [rand(Float16,x,x) for x in sizes]
+	sizes_example = [10,50,100,200]
+	matrices_example = [rand(x,x) for x in sizes_example]
 end
 
 # ╔═╡ 4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
-results_QRCGS = [QRCGS(x) for x in matrices_Float16]
+results_QRCGS = [QRCGS(x) for x in matrices_example]
 
 # ╔═╡ d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
-results_QRMGS = [QRMGS(x) for x in matrices_Float16]
+results_QRMGS = [QRMGS(x) for x in matrices_example]
 
 # ╔═╡ a0436db8-b646-46c8-8ffe-dca523a6d696
 Q_QRCGS,R_QRCGS = organizeResults(results_QRCGS)
@@ -121,36 +124,58 @@ function defineErrors(matrices,Q,R)
 	return absError, ortError
 end
 
-# ╔═╡ 334b5f8a-c980-4647-806a-4e12fbe7e02a
-absError, ortError = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
+# ╔═╡ b1803674-8ebd-488c-acca-77aac5620662
+md" ### Ejemplo"
 
 # ╔═╡ 89372931-75c1-42d9-96f6-dbaf33503a0c
-md"Todo en una sola función"
+md"""
+## Workflow
+Todo en una sola función
+"""
 
 # ╔═╡ a7214db8-dfdb-488e-88a3-a05fcbe184a7
-function hola_QRCGS(matrices, precision = Float64)
+function workflow_QRCGS(matrices, precision = Float64)
 	results = [QRCGS(x) for x in matrices]
 	Q,R = organizeResults(results)
 	return defineErrors(matrices,Q,R)
 end
 
 # ╔═╡ 7fc05d61-8e36-4b89-8f7c-2976ff4944f0
-function hola_QRMGS(matrices, precision = Float64)
+function workflow_QRMGS(matrices, precision = Float64)
 	results = [QRMGS(x) for x in matrices]
 	Q,R = organizeResults(results)
 	return defineErrors(matrices,Q,R)
 end
 
+# ╔═╡ 53619e34-5d68-4188-b577-e720f8b93944
+md" ## Instancias"
+
+# ╔═╡ 9c752274-6835-43e7-8674-853d4462a80e
+sizes = [10,50,100,200]
+
 # ╔═╡ 3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 begin
-	sizes_ = [10,50,100,200]
-	matrices_Float16_ = [rand(Float16,x,x) for x in sizes]
-	Q_16_QRCGS,R_16_QRCGS=hola_QRCGS(matrices_Float16)
-	Q_16_QRMGS,R_16_QRMGS=hola_QRMGS(matrices_Float16)
+	matrices_Float16 = [rand(Float16,x,x) for x in sizes]
+	Q_16_QRCGS,R_16_QRCGS=workflow_QRCGS(matrices_Float16)
+	Q_16_QRMGS,R_16_QRMGS=workflow_QRMGS(matrices_Float16)
+end
+
+# ╔═╡ 334b5f8a-c980-4647-806a-4e12fbe7e02a
+absError, ortError = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
+
+# ╔═╡ 100455cf-d937-4c43-82fc-1a605a1e562c
+begin
+	matrices_Float32 = [rand(Float32,x,x) for x in sizes]
+	Q_32_QRCGS,R_32_QRCGS=workflow_QRCGS(matrices_Float32)
+	Q_32_QRMGS,R_32_QRMGS=workflow_QRMGS(matrices_Float32)
 end
 
 # ╔═╡ a6a13eaf-9edc-4d00-9970-824c92740238
-Q_16_QRCGS
+begin
+	matrices_Float64 = [rand(Float64,x,x) for x in sizes]
+	Q_64_QRCGS,R_64_QRCGS=workflow_QRCGS(matrices_Float64)
+	Q_64_QRMGS,R_64_QRMGS=workflow_QRMGS(matrices_Float64)
+end
 
 # ╔═╡ 2214203b-5e22-464a-8c5f-d6db90448f93
 md"""
@@ -168,28 +193,10 @@ Representar gráficamente los resultados para cada métrica y discutir:
 
 """
 
-# ╔═╡ 2dfb3f3f-b0e8-4e0c-9788-ab4945634641
-A = [
- 0.378467  0.799976   0.584678;
- 0.70059   0.826222   0.908991;
- 0.349043  0.927266   0.161574;
- 0.995411  0.0340704  0.998302;
-]
-
-# ╔═╡ 7dfed7ef-3105-475e-9087-9914d1867dfe
-display(A)
-
-# ╔═╡ 21b45b3f-bb16-4d27-b27e-6d133269d1cb
-Q1,R1 = QRCGS(A)
-
-# ╔═╡ 72df0cdb-6705-4fed-8538-d1da15ae2927
-hola_QRCGS([A])
-
 # ╔═╡ 3dfe61a0-9a07-4708-abdb-e5192b55fb21
 md"""
 TO DO:
  * medir tiempo
- * revisar contra el ejemplo del prof (en proceso, pequeñas dif en Q y R probs por no tener acceso a todo el num) pero grandes diferencias en los errores, a revisar
  * organizar y llamar todas las veces necesarias las funciones
 """
 
@@ -496,6 +503,7 @@ version = "17.4.0+2"
 # ╟─52189c6b-4273-4223-8107-8b37d9c6418c
 # ╟─3c3f0f3e-6107-4445-b2da-713e20b64d92
 # ╠═c28e6d7b-a290-4521-9866-2fd53add53b6
+# ╠═6fe3c94f-76e2-41df-8409-5ddfd33d6150
 # ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
 # ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
 # ╠═d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
@@ -504,17 +512,17 @@ version = "17.4.0+2"
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
 # ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
+# ╟─b1803674-8ebd-488c-acca-77aac5620662
 # ╠═334b5f8a-c980-4647-806a-4e12fbe7e02a
-# ╠═89372931-75c1-42d9-96f6-dbaf33503a0c
+# ╟─89372931-75c1-42d9-96f6-dbaf33503a0c
 # ╠═a7214db8-dfdb-488e-88a3-a05fcbe184a7
 # ╠═7fc05d61-8e36-4b89-8f7c-2976ff4944f0
+# ╠═53619e34-5d68-4188-b577-e720f8b93944
+# ╠═9c752274-6835-43e7-8674-853d4462a80e
 # ╠═3a73592b-41db-467c-a3c9-9ef7cd6ccc64
+# ╠═100455cf-d937-4c43-82fc-1a605a1e562c
 # ╠═a6a13eaf-9edc-4d00-9970-824c92740238
 # ╠═2214203b-5e22-464a-8c5f-d6db90448f93
-# ╠═2dfb3f3f-b0e8-4e0c-9788-ab4945634641
-# ╠═7dfed7ef-3105-475e-9087-9914d1867dfe
-# ╠═21b45b3f-bb16-4d27-b27e-6d133269d1cb
-# ╠═72df0cdb-6705-4fed-8538-d1da15ae2927
 # ╠═3dfe61a0-9a07-4708-abdb-e5192b55fb21
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
