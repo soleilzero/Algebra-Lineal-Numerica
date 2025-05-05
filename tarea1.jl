@@ -276,6 +276,8 @@ end
 md"""
 ### Análisis de resultados
 
+Este análisis está basado en las gráficas anteriores. Estas pueden cambiar cada vez
+
 > ¿Cuál de los dos algoritmos es más estable numéricamente?
 
 Podemos decir que el algoritmo modificado es menos estable numéricamente, debido a que...
@@ -292,6 +294,8 @@ El más rápido es el algoritmo clásico, desde n=100.
 md"""
  ## Fuentes externas
 Durante el desarrollo de este proyecto, consulté diversas fuentes externas para comprender y aplicar correctamente conceptos y estructuras del lenguaje de programación Julia. Las principales fuentes utilizadas fueron:
+
+ * Notas de clase: De las cuales obtuve las funciones QRCGS y QRMGS.
 
  * Documentación oficial de Julia: Utilicé la documentación oficial para entender y aplicar correctamente las estructuras de datos como arrays y diccionarios. En particular, consulté las secciones sobre arrays y colecciones y estructuras de datos .
 
@@ -1545,7 +1549,7 @@ version = "1.4.1+2"
 # ╠═34149410-d115-4a31-8cc4-0644afd2a940
 # ╠═4aa344a4-a802-4593-b0cf-0d4b35babef1
 # ╠═2485f087-ff85-4065-8f2b-35a21a864f65
-# ╟─928218bb-2920-4042-91b8-277ab8a5da55
+# ╠═928218bb-2920-4042-91b8-277ab8a5da55
 # ╠═2ebcc88c-c421-4595-abf0-b6ef236de52a
 # ╠═3dfe61a0-9a07-4708-abdb-e5192b55fb21
 # ╟─00000000-0000-0000-0000-000000000001
