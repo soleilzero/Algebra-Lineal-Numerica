@@ -15,6 +15,11 @@ end
 # ╔═╡ 0bfb8466-89bd-410b-9176-54cc257a1c69
 md"""
 # Tarea 1
+Debido a que se debe realizar el mismo proceso varias veces, se construyeron 'workflows' en los que se ejecutan todos los pasos necesarios para obtener los resultados.
+En cada sección se introducen paulatinamente todas las partes del workflow, ya sea con funciones o con ejemplos.
+
+## Objetivo
+Analizar experimentalmente la sensibilidad a la precisión numérica y el comportamiento computacional de los algoritmos de Gram-Schmidt (GS) y Gram-Schmidt Modificado (GSM) implementados en Julia, usando diferentes representaciones de punto flotante (Float16, Float32, Float64).
 """
 
 # ╔═╡ b6f1a156-268d-11f0-02c5-939326678b23
@@ -63,17 +68,15 @@ end
 # ╔═╡ f298da4c-c52c-4150-abee-03a55dae42dc
 md"""
 ## Familia de matrices
-Generar una familia de matrices aleatorias de tamaño creciente (por ejemplo, n=10,50,100,200, n = 10, 50, 100, 200, n=10,50,100,200) y aplicar ambos algoritmos a cada una. Puede usar también la familia de matrices de Hilbert o del mercado de matrices https://math.nist.gov/MatrixMarket/ 
+En el ejemplo se genera la familia de matrices aleatorias n=10,50,100,200 y se aplican ambos algoritmos a cada una.
+
+Además, se la función organizeResults, cuya finalidad es separar una lista de tuplas que contienen las matrices Q y R generadas por el algoritmo de factorización. Esta función toma como entrada un arreglo de la forma [(Q₁, R₁), (Q₂, R₂), ...] y devuelve dos arreglos separados: uno con todas las matrices Q y otro con todas las matrices R.
 """
-
-# ╔═╡ 52189c6b-4273-4223-8107-8b37d9c6418c
-md"Generamos la familia de matrices aleatorias n=10,50,100,200"
-
-# ╔═╡ 3c3f0f3e-6107-4445-b2da-713e20b64d92
-md"Aplicamos ambos algoritmos a cada una"
 
 # ╔═╡ c28e6d7b-a290-4521-9866-2fd53add53b6
 function organizeResults(array)
+	# A partir de un array [(Q₁, R₁), (Q₂, R₂), ...]
+	# devuelve un arreglo Q = [Q₁, Q₂, ...] y R = [R₁, R₂, ...]. 
 	Q = []; R = [];
 	for i in range(1,size(array)[1])
 		push!(Q, array[i][1]);
@@ -86,16 +89,25 @@ end
 md" ### Ejemplo"
 
 # ╔═╡ 3614f55e-062f-4275-96fa-ef004f40ce0c
-begin
-	sizes_example = [10,50,100,200]
-	matrices_example = [rand(x,x) for x in sizes_example]
-end
+sizes_example = [10,50,100,200]
+
+# ╔═╡ 56919e43-0f9e-4f03-a7bc-e867170731a7
+md"Se generan matrices aleatorias de cada tamaño especificado"
+
+# ╔═╡ 61a33801-81d8-473d-86df-cbbcf92ab7e6
+matrices_example = [rand(x,x) for x in sizes_example]
+
+# ╔═╡ ac8214c3-9613-4a1c-b743-3c799d6d97fb
+md"Se aplican ambos algoritmos"
 
 # ╔═╡ 4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
 results_QRCGS = [QRCGS(x) for x in matrices_example]
 
 # ╔═╡ d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
 results_QRMGS = [QRMGS(x) for x in matrices_example]
+
+# ╔═╡ b0391f14-b333-445e-a4b5-7401bdea2fbb
+md"Se organizan los resultados en dos arreglos Q y R"
 
 # ╔═╡ a0436db8-b646-46c8-8ffe-dca523a6d696
 Q_QRCGS,R_QRCGS = organizeResults(results_QRCGS)
@@ -113,7 +125,7 @@ Para cada tipo de precisión (Float16, Float32, Float64), medir:
 
 # ╔═╡ fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 md" ### Errores
-Medición del residuo absoluto de la factorización y residuo de la ortogonalización
+Medición del residuo absoluto de la factorización y residuo de la ortogonalización.
 "
 
 # ╔═╡ ff0538ab-f3f3-440e-bf79-9a6c533e05c0
@@ -146,6 +158,7 @@ md" ### Ejemplo"
 # ╔═╡ 89372931-75c1-42d9-96f6-dbaf33503a0c
 md"""
 ## Workflow
+Se organizan los pasos anteriores en una función
 """
 
 # ╔═╡ a7214db8-dfdb-488e-88a3-a05fcbe184a7
@@ -163,7 +176,12 @@ function workflow_QRMGS(matrices)
 end
 
 # ╔═╡ 53619e34-5d68-4188-b577-e720f8b93944
-md" ## Instancias"
+md"
+ ## Instancias
+Utilizando el código desarrollado, se ejecutó todos los ejemplos requeridos cubriendo las seis combinaciones posibles entre los tres niveles de precisión (Float16, Float32, Float64) y los dos algoritmos de factorización (Gram-Schmidt y Gram-Schmidt Modificado). 
+
+Para cada combinación se calcularon el error de ortogonalidad, el error absoluto de factorización y el tiempo de ejecución correspondientes.
+"
 
 # ╔═╡ 9c752274-6835-43e7-8674-853d4462a80e
 sizes = [10,50,100,200]
@@ -181,8 +199,8 @@ example_error = defineErrors(matrices_Float16,Q_QRCGS,R_QRCGS)
 # ╔═╡ a33fb077-2677-4504-bbaf-a499c8d41f8d
 time_QRCGS(matrices_Float16)
 
-# ╔═╡ 3fe34809-ea01-40bb-b8c9-1e9dba343a39
-workflow_QRCGS(matrices_Float16); workflow_QRMGS(matrices_Float16)
+# ╔═╡ fc748c1a-052e-468e-84be-e522af62d39c
+time_QRMGS(matrices_Float16)
 
 # ╔═╡ 100455cf-d937-4c43-82fc-1a605a1e562c
 begin
@@ -223,9 +241,9 @@ md" ### Algoritmo modificado"
 
 # ╔═╡ d11e7631-9600-4c59-80f0-564a6cdd92ce
 begin
-	plot(sizes, error_16_QRMGS["absoluteError"], label="GS Float16", lw=2, marker=:circle)
-	plot!(sizes, error_32_QRMGS["absoluteError"], label="GS Float32", lw=2, marker=:circle)
-	plot!(sizes, error_64_QRMGS["absoluteError"], label="GS Float64", lw=2, marker=:circle)	
+	plot(sizes, error_16_QRMGS["absoluteError"], label="GSM Float16", lw=2, marker=:circle)
+	plot!(sizes, error_32_QRMGS["absoluteError"], label="GSM Float32", lw=2, marker=:circle)
+	plot!(sizes, error_64_QRMGS["absoluteError"], label="GSM Float64", lw=2, marker=:circle)	
 	xlabel!("Tamaño de la matriz")
 	ylabel!("Error de factorización")
 end
@@ -250,9 +268,9 @@ md" ### Algoritmo modificado"
 
 # ╔═╡ 2aab4c8a-fc4b-497d-8fc9-343600bdfe7a
 begin
-	plot(sizes, error_16_QRMGS["ortogonalizationError"], label="GS Float16", lw=2, marker=:circle)
-		plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GS Float32", lw=2, marker=:circle)
-		plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GS Float64", lw=2, marker=:circle)
+	plot(sizes, error_16_QRMGS["ortogonalizationError"], label="GSM Float16", lw=2, marker=:circle)
+		plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GSM Float32", lw=2, marker=:circle)
+		plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GSM Float64", lw=2, marker=:circle)
 		xlabel!("Tamaño de la matriz")
 		ylabel!("Error de ortogonalidad")
 end
@@ -262,19 +280,19 @@ md" ## Velocidad"
 
 # ╔═╡ 4aa344a4-a802-4593-b0cf-0d4b35babef1
 begin
-	plot(sizes, time_16_QRCGS, label="Clásico Float16", marker=:circle)
-	plot!(sizes, time_32_QRCGS, label="Clásico Float32", marker=:circle)
-	plot!(sizes, time_64_QRCGS, label="Clásico Float64", marker=:circle)
-	plot!(sizes, time_16_QRMGS, label="Modificado Float16", marker=:square)
-	plot!(sizes, time_32_QRMGS, label="Modificado Float32", marker=:square)
-	plot!(sizes, time_64_QRMGS, label="Modificado Float64", marker=:square)
+	plot(sizes, time_16_QRCGS, label="GS Float16", marker=:circle)
+	plot!(sizes, time_32_QRCGS, label="GS Float32", marker=:circle)
+	plot!(sizes, time_64_QRCGS, label="GS Float64", marker=:circle)
+	plot!(sizes, time_16_QRMGS, label="GSM Float16", marker=:square)
+	plot!(sizes, time_32_QRMGS, label="GSM Float32", marker=:square)
+	plot!(sizes, time_64_QRMGS, label="GSM Float64", marker=:square)
 	xlabel!("Tamaño de la matriz")
 	ylabel!("Segundos")
 end
 
 # ╔═╡ 2485f087-ff85-4065-8f2b-35a21a864f65
 md"""
-### Análisis de resultados
+### Análisis de gráficas
 
 Este análisis está basado en las 3 diferentes ejecuciones realizadas de cada algoritmo. Por lo cual, sus conclusiones no son totalmente fiables. 
 
@@ -1500,18 +1518,20 @@ version = "1.4.1+2"
 # ╠═b6f1a156-268d-11f0-02c5-939326678b23
 # ╠═8495c828-e82f-4330-aae7-b1fc51972486
 # ╠═54ba1080-8e48-4df9-8e22-be0235a1177a
-# ╟─f298da4c-c52c-4150-abee-03a55dae42dc
-# ╟─52189c6b-4273-4223-8107-8b37d9c6418c
-# ╟─3c3f0f3e-6107-4445-b2da-713e20b64d92
+# ╠═f298da4c-c52c-4150-abee-03a55dae42dc
 # ╠═c28e6d7b-a290-4521-9866-2fd53add53b6
 # ╠═6fe3c94f-76e2-41df-8409-5ddfd33d6150
 # ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
+# ╠═56919e43-0f9e-4f03-a7bc-e867170731a7
+# ╠═61a33801-81d8-473d-86df-cbbcf92ab7e6
+# ╠═ac8214c3-9613-4a1c-b743-3c799d6d97fb
 # ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
 # ╠═d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
+# ╠═b0391f14-b333-445e-a4b5-7401bdea2fbb
 # ╠═a0436db8-b646-46c8-8ffe-dca523a6d696
 # ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
-# ╟─fcdc43e3-4948-4c6e-97c2-e3de62509dfe
+# ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
 # ╟─c0671685-a668-46fd-92d9-c956bfbc763f
 # ╠═e6a09ab1-bd05-4425-8761-78144671c9be
@@ -1519,12 +1539,12 @@ version = "1.4.1+2"
 # ╠═47649ae7-fd70-4bc3-b939-7b6defaacd36
 # ╠═28c6ccd0-411a-480d-8f33-5496c1999a15
 # ╠═a33fb077-2677-4504-bbaf-a499c8d41f8d
+# ╠═fc748c1a-052e-468e-84be-e522af62d39c
 # ╠═89372931-75c1-42d9-96f6-dbaf33503a0c
 # ╠═a7214db8-dfdb-488e-88a3-a05fcbe184a7
 # ╠═7fc05d61-8e36-4b89-8f7c-2976ff4944f0
 # ╠═53619e34-5d68-4188-b577-e720f8b93944
 # ╠═9c752274-6835-43e7-8674-853d4462a80e
-# ╠═3fe34809-ea01-40bb-b8c9-1e9dba343a39
 # ╠═3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 # ╠═100455cf-d937-4c43-82fc-1a605a1e562c
 # ╠═a6a13eaf-9edc-4d00-9970-824c92740238
