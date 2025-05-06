@@ -248,6 +248,39 @@ begin
 	ylabel!("Error de factorización")
 end
 
+# ╔═╡ 0c602bd2-f6c1-4400-b9fb-48afbdd7737f
+md" ### Precisión Float16"
+
+# ╔═╡ 0fbe97d3-4abb-4c78-95e2-0c9f4be39401
+begin
+	plot(sizes, error_16_QRCGS["absoluteError"], label="GS Float16", lw=2, marker=:circle)
+	plot!(sizes, error_16_QRMGS["absoluteError"], label="GSM Float16", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de factorización")
+end
+
+# ╔═╡ a283545c-fa64-4f3e-acb3-24c1dbe21ff0
+md" ### Precisión Float32"
+
+# ╔═╡ 31b5d40a-0d7c-4a30-b6d7-329a6c1e9e88
+begin
+	plot(sizes, error_32_QRCGS["absoluteError"], label="GS Float32", lw=2, marker=:circle)
+	plot!(sizes, error_32_QRMGS["absoluteError"], label="GSM Float32", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de factorización")
+end
+
+# ╔═╡ 39750d1e-bf43-462a-a6f0-6234d9500971
+md" ### Precisión Float64"
+
+# ╔═╡ f8b3f63a-c879-4e6e-aaab-9468ab2fb424
+begin
+	plot(sizes, error_64_QRCGS["absoluteError"], label="GS Float64", lw=2, marker=:circle)
+	plot!(sizes, error_64_QRMGS["absoluteError"], label="GSM Float64", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de factorización")
+end
+
 # ╔═╡ ea7bdfd7-2221-4375-be91-26733066b28f
 md" ## Error de ortogonalidad"
 
@@ -269,10 +302,43 @@ md" ### Algoritmo modificado"
 # ╔═╡ 2aab4c8a-fc4b-497d-8fc9-343600bdfe7a
 begin
 	plot(sizes, error_16_QRMGS["ortogonalizationError"], label="GSM Float16", lw=2, marker=:circle)
-		plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GSM Float32", lw=2, marker=:circle)
-		plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GSM Float64", lw=2, marker=:circle)
-		xlabel!("Tamaño de la matriz")
-		ylabel!("Error de ortogonalidad")
+	plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GSM Float32", lw=2, marker=:circle)
+	plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GSM Float64", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de ortogonalidad")
+end
+
+# ╔═╡ a63c00f1-3804-4ae1-a52a-4f43f3f80601
+md" ### Precisión Float16"
+
+# ╔═╡ 2661ca95-0527-4366-bca9-983a0c76b595
+begin
+	plot(sizes, error_16_QRCGS["ortogonalizationError"], label="GS Float16", lw=2, marker=:circle)
+	plot!(sizes, error_16_QRMGS["ortogonalizationError"], label="GSM Float16", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de ortogonalidad")
+end
+
+# ╔═╡ b27477c6-b268-4547-acaf-c4bd6e52b88d
+md" ### Precisión Float32"
+
+# ╔═╡ 76fec093-060b-4c3f-95b6-a6ff2f5567d4
+begin
+	plot(sizes, error_32_QRCGS["ortogonalizationError"], label="GS Float32", lw=2, marker=:circle)
+	plot!(sizes, error_32_QRMGS["ortogonalizationError"], label="GSM Float32", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de ortogonalidad")
+end
+
+# ╔═╡ 90a93862-8732-4bae-900a-330882ecb043
+md" ### Precisión Float64"
+
+# ╔═╡ e6fe5491-82f5-4124-93fb-75f1c98a7e9d
+begin
+	plot(sizes, error_64_QRCGS["ortogonalizationError"], label="GS Float64", lw=2, marker=:circle)
+	plot!(sizes, error_64_QRMGS["ortogonalizationError"], label="GSM Float64", lw=2, marker=:circle)
+	xlabel!("Tamaño de la matriz")
+	ylabel!("Error de ortogonalidad")
 end
 
 # ╔═╡ 34149410-d115-4a31-8cc4-0644afd2a940
@@ -298,7 +364,7 @@ Este análisis está basado en las 3 diferentes ejecuciones realizadas de cada a
 
 > ¿Cuál de los dos algoritmos es más estable numéricamente?
 
-Podemos decir que el algoritmo modificado es menos estable numéricamente, debido a que...
+De acuerdo a las gráficas, podemos decir que el algoritmo clásico es el más estable numéricamente. Esto debido a que tiene un menor error de factorización y de ortogonalidad en todas menos una de las gráficas comparativas (la comparación de error de ortogonalidad para Float64).
 
 > ¿Cómo afecta la precisión (Float16, Float32, Float64) a cada algoritmo?
 
@@ -307,6 +373,14 @@ La precisión no afecta el error de factorización de los algoritmos ni el error
 > ¿Cuál es más rápido? ¿A partir de qué tamaño?
 El más rápido es el algoritmo clásico, desde n=100.
 """
+
+# ╔═╡ 1ca201cd-3ec6-4162-aacc-555650c0bfc2
+md"
+ ## Reflexión
+Durante el desarrollo de esta tarea enfrenté diversas dificultades, principalmente relacionadas con la manipulación de estructuras de datos en Julia, como listas de tuplas, arrays de matrices y diferencias sutiles en el tratamiento de filas y columnas. También surgieron desafíos al aplicar funciones sobre arreglos de forma vectorizada sin perder la estructura de los datos.
+
+A pesar de estas dificultades, el proceso permitió afianzar mi comprensión sobre la implementación de algoritmos numéricos, el manejo de precisión numérica, y el diseño de flujos de trabajo reproducibles en Julia. Además, adquirí mayor familiaridad con herramientas para medir errores, tiempos de ejecución y organizar resultados de forma sistemática. En conjunto, la experiencia fortaleció tanto mis habilidades de programación como mi intuición numérica.
+"
 
 # ╔═╡ 928218bb-2920-4042-91b8-277ab8a5da55
 md"""
@@ -349,6 +423,8 @@ Los usos principales de la IA incluyeron:
  * Captura del tiempo de ejecución de funciones junto con sus resultados.
 
 	Prompt utilizado: “Usando @time en julia, cómo puedo guardar el tiempo demorado y el resultado de la función”
+
+ * Redacción.
 
 Todas las decisiones de implementación, validación de resultados y análisis de los datos obtenidos fueron realizados personalmente. La inteligencia artificial se utilizó como herramienta complementaria de consulta, y no sustituyó mi juicio académico ni la autoría del trabajo.
 """
@@ -1554,15 +1630,28 @@ version = "1.4.1+2"
 # ╠═0a10b74c-ff89-4475-993b-f67741c8c915
 # ╠═ad25b4fc-b34e-4424-9976-80122cce64d0
 # ╠═d11e7631-9600-4c59-80f0-564a6cdd92ce
+# ╠═0c602bd2-f6c1-4400-b9fb-48afbdd7737f
+# ╠═0fbe97d3-4abb-4c78-95e2-0c9f4be39401
+# ╠═a283545c-fa64-4f3e-acb3-24c1dbe21ff0
+# ╠═31b5d40a-0d7c-4a30-b6d7-329a6c1e9e88
+# ╠═39750d1e-bf43-462a-a6f0-6234d9500971
+# ╠═f8b3f63a-c879-4e6e-aaab-9468ab2fb424
 # ╟─ea7bdfd7-2221-4375-be91-26733066b28f
 # ╟─e596ab5d-f5f6-433b-acc2-085493352cf8
 # ╠═dc80f34f-71f8-4f6b-8a41-ac9c0f72ab99
 # ╟─7275846c-a767-44c8-95e7-24c2c4031e2b
 # ╠═2aab4c8a-fc4b-497d-8fc9-343600bdfe7a
+# ╠═a63c00f1-3804-4ae1-a52a-4f43f3f80601
+# ╠═2661ca95-0527-4366-bca9-983a0c76b595
+# ╠═b27477c6-b268-4547-acaf-c4bd6e52b88d
+# ╠═76fec093-060b-4c3f-95b6-a6ff2f5567d4
+# ╠═90a93862-8732-4bae-900a-330882ecb043
+# ╠═e6fe5491-82f5-4124-93fb-75f1c98a7e9d
 # ╠═34149410-d115-4a31-8cc4-0644afd2a940
 # ╠═4aa344a4-a802-4593-b0cf-0d4b35babef1
 # ╠═2485f087-ff85-4065-8f2b-35a21a864f65
-# ╠═928218bb-2920-4042-91b8-277ab8a5da55
+# ╠═1ca201cd-3ec6-4162-aacc-555650c0bfc2
+# ╟─928218bb-2920-4042-91b8-277ab8a5da55
 # ╠═2ebcc88c-c421-4595-abf0-b6ef236de52a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
