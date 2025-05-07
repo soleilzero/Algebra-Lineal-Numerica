@@ -403,26 +403,17 @@ En el desarrollo de este proyecto utilicé el modelo de lenguaje ChatGPT de Open
 Los usos principales de la IA incluyeron:
 
  * Consulta sobre sintaxis y estructuras idiomáticas en Julia para la creación de arrays derivados.
-    
-	Prompt utilizado: “¿Cómo puedo definir en Julia un nuevo array a partir de uno existente?”
+    Prompt utilizado: “¿Cómo puedo definir en Julia un nuevo array a partir de uno existente?”
     y luego: “Cómo puedo definir dos arrays a partir de uno original? Para que sea equivalente a ‘a,b = func()’”
     y: “Quiero formar dos nuevos arrays Y y Z a partir de X tal que y[0], z[0] = func(x[0])”
 
- * Ayuda para aplicar funciones sobre filas o columnas de una matriz, asegurando el comportamiento esperado en contextos donde los datos no eran escalar por escalar.
+ * Ayuda para aplicar funciones sobre filas o columnas de una matriz, asegurando el comportamiento esperado en contextos donde los datos no eran escalar por escalar. Prompt utilizado: “Tengo un problema, el argumento de la función func() está siendo tomado como un vector en lugar de una matriz”
 
-	Prompt utilizado: “Tengo un problema, el argumento de la función func() está siendo tomado como un vector en lugar de una matriz”
+ * Generación de código para graficar errores de ortogonalidad y factorización utilizando Plots.jl. Prompt utilizado: “Cómo podría presentarlos en una gráfica?”
 
- * Generación de código para graficar errores de ortogonalidad y factorización utilizando Plots.jl.
+ * Asesoría sobre cómo medir la estabilidad numérica de un algoritmo, incluyendo métricas concretas como el error de ortogonalidad y de factorización. Prompt utilizado: “Cómo puedo medir la estabilidad numérica del algoritmo?”
 
-	Prompt utilizado: “Cómo podría presentarlos en una gráfica?”
-
- * Asesoría sobre cómo medir la estabilidad numérica de un algoritmo, incluyendo métricas concretas como el error de ortogonalidad y de factorización.
-
-	Prompt utilizado: “Cómo puedo medir la estabilidad numérica del algoritmo?”
-
- * Captura del tiempo de ejecución de funciones junto con sus resultados.
-
-	Prompt utilizado: “Usando @time en julia, cómo puedo guardar el tiempo demorado y el resultado de la función”
+ * Captura del tiempo de ejecución de funciones junto con sus resultados. Prompt utilizado: “Usando @time en julia, cómo puedo guardar el tiempo demorado y el resultado de la función”
 
  * Redacción.
 
@@ -1589,69 +1580,69 @@ version = "1.4.1+2"
 """
 
 # ╔═╡ Cell order:
-# ╠═0bfb8466-89bd-410b-9176-54cc257a1c69
+# ╟─0bfb8466-89bd-410b-9176-54cc257a1c69
 # ╠═12c18a31-344e-4514-b28e-59e3bfd0b592
-# ╠═b6f1a156-268d-11f0-02c5-939326678b23
+# ╟─b6f1a156-268d-11f0-02c5-939326678b23
 # ╠═8495c828-e82f-4330-aae7-b1fc51972486
 # ╠═54ba1080-8e48-4df9-8e22-be0235a1177a
-# ╠═f298da4c-c52c-4150-abee-03a55dae42dc
+# ╟─f298da4c-c52c-4150-abee-03a55dae42dc
 # ╠═c28e6d7b-a290-4521-9866-2fd53add53b6
-# ╠═6fe3c94f-76e2-41df-8409-5ddfd33d6150
+# ╟─6fe3c94f-76e2-41df-8409-5ddfd33d6150
 # ╠═3614f55e-062f-4275-96fa-ef004f40ce0c
-# ╠═56919e43-0f9e-4f03-a7bc-e867170731a7
+# ╟─56919e43-0f9e-4f03-a7bc-e867170731a7
 # ╠═61a33801-81d8-473d-86df-cbbcf92ab7e6
-# ╠═ac8214c3-9613-4a1c-b743-3c799d6d97fb
+# ╟─ac8214c3-9613-4a1c-b743-3c799d6d97fb
 # ╠═4c4ae68e-c4e0-46e9-8138-2a6b1da4e852
 # ╠═d53b9bb5-7bbe-46f8-bdb8-64bbfc3e42b1
-# ╠═b0391f14-b333-445e-a4b5-7401bdea2fbb
+# ╟─b0391f14-b333-445e-a4b5-7401bdea2fbb
 # ╠═a0436db8-b646-46c8-8ffe-dca523a6d696
-# ╠═07981b90-9c99-4bfe-b4c0-2888e4026f52
+# ╟─07981b90-9c99-4bfe-b4c0-2888e4026f52
 # ╟─c75fa7f2-158e-4ddd-ae29-5b070f595a0f
-# ╠═fcdc43e3-4948-4c6e-97c2-e3de62509dfe
+# ╟─fcdc43e3-4948-4c6e-97c2-e3de62509dfe
 # ╠═ff0538ab-f3f3-440e-bf79-9a6c533e05c0
 # ╟─c0671685-a668-46fd-92d9-c956bfbc763f
 # ╠═e6a09ab1-bd05-4425-8761-78144671c9be
 # ╠═a5629bd5-6544-4077-956b-40d6f1e3507d
-# ╠═47649ae7-fd70-4bc3-b939-7b6defaacd36
+# ╟─47649ae7-fd70-4bc3-b939-7b6defaacd36
 # ╠═28c6ccd0-411a-480d-8f33-5496c1999a15
 # ╠═a33fb077-2677-4504-bbaf-a499c8d41f8d
 # ╠═fc748c1a-052e-468e-84be-e522af62d39c
-# ╠═89372931-75c1-42d9-96f6-dbaf33503a0c
+# ╟─89372931-75c1-42d9-96f6-dbaf33503a0c
 # ╠═a7214db8-dfdb-488e-88a3-a05fcbe184a7
 # ╠═7fc05d61-8e36-4b89-8f7c-2976ff4944f0
-# ╠═53619e34-5d68-4188-b577-e720f8b93944
+# ╟─53619e34-5d68-4188-b577-e720f8b93944
 # ╠═9c752274-6835-43e7-8674-853d4462a80e
 # ╠═3a73592b-41db-467c-a3c9-9ef7cd6ccc64
 # ╠═100455cf-d937-4c43-82fc-1a605a1e562c
 # ╠═a6a13eaf-9edc-4d00-9970-824c92740238
-# ╠═2214203b-5e22-464a-8c5f-d6db90448f93
+# ╟─2214203b-5e22-464a-8c5f-d6db90448f93
 # ╟─70c63053-b2a3-41fb-95b5-4640212d4cf5
 # ╟─bb1ffc81-0f45-44e8-8f9c-08ba1bf3d803
 # ╠═0a10b74c-ff89-4475-993b-f67741c8c915
-# ╠═ad25b4fc-b34e-4424-9976-80122cce64d0
+# ╟─ad25b4fc-b34e-4424-9976-80122cce64d0
 # ╠═d11e7631-9600-4c59-80f0-564a6cdd92ce
-# ╠═0c602bd2-f6c1-4400-b9fb-48afbdd7737f
+# ╟─0c602bd2-f6c1-4400-b9fb-48afbdd7737f
 # ╠═0fbe97d3-4abb-4c78-95e2-0c9f4be39401
-# ╠═a283545c-fa64-4f3e-acb3-24c1dbe21ff0
+# ╟─a283545c-fa64-4f3e-acb3-24c1dbe21ff0
 # ╠═31b5d40a-0d7c-4a30-b6d7-329a6c1e9e88
-# ╠═39750d1e-bf43-462a-a6f0-6234d9500971
+# ╟─39750d1e-bf43-462a-a6f0-6234d9500971
 # ╠═f8b3f63a-c879-4e6e-aaab-9468ab2fb424
 # ╟─ea7bdfd7-2221-4375-be91-26733066b28f
 # ╟─e596ab5d-f5f6-433b-acc2-085493352cf8
 # ╠═dc80f34f-71f8-4f6b-8a41-ac9c0f72ab99
 # ╟─7275846c-a767-44c8-95e7-24c2c4031e2b
 # ╠═2aab4c8a-fc4b-497d-8fc9-343600bdfe7a
-# ╠═a63c00f1-3804-4ae1-a52a-4f43f3f80601
+# ╟─a63c00f1-3804-4ae1-a52a-4f43f3f80601
 # ╠═2661ca95-0527-4366-bca9-983a0c76b595
-# ╠═b27477c6-b268-4547-acaf-c4bd6e52b88d
+# ╟─b27477c6-b268-4547-acaf-c4bd6e52b88d
 # ╠═76fec093-060b-4c3f-95b6-a6ff2f5567d4
-# ╠═90a93862-8732-4bae-900a-330882ecb043
+# ╟─90a93862-8732-4bae-900a-330882ecb043
 # ╠═e6fe5491-82f5-4124-93fb-75f1c98a7e9d
-# ╠═34149410-d115-4a31-8cc4-0644afd2a940
+# ╟─34149410-d115-4a31-8cc4-0644afd2a940
 # ╠═4aa344a4-a802-4593-b0cf-0d4b35babef1
-# ╠═2485f087-ff85-4065-8f2b-35a21a864f65
-# ╠═1ca201cd-3ec6-4162-aacc-555650c0bfc2
+# ╟─2485f087-ff85-4065-8f2b-35a21a864f65
+# ╟─1ca201cd-3ec6-4162-aacc-555650c0bfc2
 # ╟─928218bb-2920-4042-91b8-277ab8a5da55
-# ╠═2ebcc88c-c421-4595-abf0-b6ef236de52a
+# ╟─2ebcc88c-c421-4595-abf0-b6ef236de52a
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
