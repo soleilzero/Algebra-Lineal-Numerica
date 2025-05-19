@@ -257,11 +257,15 @@ Para matrices grandes y dispersas (sparse), compare conceptualmente y computacio
 
 "
 
+# ╔═╡ fd5d6a5b-2e6c-4737-8986-7ff8693e1389
+md" ### Comparación conceptual"
+
+# ╔═╡ f91d6a76-ec4b-49d5-9f0b-3e8511ab707f
+md" ### Comparación computacional"
+
 # ╔═╡ a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 md"
-Responda:
-
-¿Cuál de los dos métodos considera más adecuado para mantener la dispersión en una factorización QR de una matriz rala? 
+### ¿Cuál de los dos métodos considera más adecuado para mantener la dispersión en una factorización QR de una matriz dispersa? 
 
 Justifique su respuesta en términos de:
 * la estructura de la matriz, 
@@ -269,6 +273,33 @@ Justifique su respuesta en términos de:
 * el patrón de llenado (fill-in).
 
 "
+
+# ╔═╡ 9cce2e64-c3ee-461d-98f0-b7a3460046e8
+md"
+Recordemos que:
+
+La *transformación de Householder* implica una reflexión ortogonal $H = I - 2 \frac{vv^\top}{v^\top v}$ que anula simultáneamente todos los elementos debajo de una entrada de la columna. 
+
+La *rotación de Givens* implica una rotación ortogonal en el plano $(i, j)$ que anula un único elemento mediante una transformación local.
+"
+
+# ╔═╡ 2e5b592c-2e88-4552-9788-a31d7be04ad1
+md"
+
+| **Criterio**                                                    | **Transformaciones de Householder**                                                                                                         | **Rotaciones de Givens**                                                                                           | **Ganador (para matrices dispersas)**                                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| **Estructura de los operadores ortogonales**                    | Se requiere almacenar vectores reflejados ($v$), usualmente densos. Las matrices $H_k$ no son dispersas.                                    | Las rotaciones son representadas por ángulos $(c, s)$; no se almacenan matrices completas.                         | **Givens** (mejor almacenamiento)                                                          |
+| **Preservación de la estructura dispersa (Fill-in)**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en potencialmente toda la submatriz inferior derecha.                             | Buena: al modificar solo dos filas, el patrón de dispersión puede mantener en el resto de la matriz.                            | **Givens** (preserva mejor la dispersión)                                                  |
+| **Preservación de la estructura dispersa (Fill-in)**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en potencialmente toda la submatriz inferior derecha.                             | Buena: al modificar solo dos filas, el patrón de dispersión puede mantener en el resto de la matriz.                            | **Givens** (preserva mejor la dispersión)                                                  |
+| **Costo computacional por transformación**                      | $\mathcal{O}(mn)$ por reflexión (en el caso general), pues afecta múltiples columnas y filas.                                               | $\mathcal{O}(n)$ por rotación (en promedio), afectando solo dos filas.                                             | **Givens** (mejor costo local)                                                             |
+| **Número total de transformaciones**                            | $\min(m, n)$: una reflexión por columna.                                                                                                    | Hasta $\frac{n(n-1)}{2}$ en el peor caso (aunque muchas operaciones pueden omitirse si los elementos ya son cero). | **Empate** (Householder usa menos transformaciones, Givens puede optimizarse en dispersos) |
+"
+
+# ╔═╡ 0cf3e3c2-6691-422f-a3f8-324f1d11f20f
+
+
+# ╔═╡ c7927f9f-a505-4099-b0e4-3bfedab1acb1
+md"Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas."
 
 # ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 md"
@@ -283,8 +314,9 @@ md"
 md"
 ### Recursos usados
 - ChatGPT
-- https://www.youtube.com/playlist?list=PLxKgD50sMRvBHxvNPnGQ1kEHlO5y7mSnh Householder Method for QR decomposition playlist by Adam Sperry
-- https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting
+- [Householder Method for QR decomposition playlist by Adam Sperry] (https://www.youtube.com/playlist?list=PLxKgD50sMRvBHxvNPnGQ1kEHlO5y7mSnh)
+- [Computational tools for research in (bio)statistics, including numerical linear algebra and optimization by Dr. Hua Zhou](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting)
+- [Householder reflections versus givens rotations in sparse orthogonal decomposition](https://www.sciencedirect.com/science/article/pii/002437958790111X)
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1445,7 +1477,13 @@ version = "1.4.1+2"
 # ╠═adba9ec6-5fd1-4e09-8974-20f758ae71d7
 # ╠═b0b87d52-8fe9-4094-8aa4-b4f3f279049c
 # ╠═735b730a-f3a5-4f60-96df-39388326b05c
+# ╠═fd5d6a5b-2e6c-4737-8986-7ff8693e1389
+# ╠═f91d6a76-ec4b-49d5-9f0b-3e8511ab707f
 # ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
+# ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
+# ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
+# ╠═0cf3e3c2-6691-422f-a3f8-324f1d11f20f
+# ╠═c7927f9f-a505-4099-b0e4-3bfedab1acb1
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 # ╟─00000000-0000-0000-0000-000000000001
