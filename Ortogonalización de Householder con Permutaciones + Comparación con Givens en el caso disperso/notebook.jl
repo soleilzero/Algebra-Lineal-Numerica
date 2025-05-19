@@ -12,6 +12,13 @@ begin
 	using Plots
 end
 
+# ╔═╡ 4e3fa428-1811-41d4-8e0c-4e47985536f7
+begin
+	using Random
+	y1 = randn(5)    # response vector
+	X1 = randn(5, 3) # predictor matrix
+end
+
 # ╔═╡ 4f16bf43-ed9a-4e2b-8e41-600b8a4b0ea4
 md"""
 # Ortogonalización de Householder con Permutaciones + Comparación con Givens en el caso disperso
@@ -64,6 +71,9 @@ A=QRZ.
 🔍 Evalúe su algoritmo en presencia de columnas linealmente dependientes o casidependientes.
 """
 
+# ╔═╡ d74fce97-4be3-4275-8818-4f18982a678e
+md" ### Algoritmo de ortogonalización de Householder con permutaciones de columnas"
+
 # ╔═╡ e92c4212-bbb5-436e-9280-d091671d5f0e
 function qr_householder_pivoting(A::Matrix{Float64}; tol=1e-12)
     m, n = size(A)
@@ -104,42 +114,177 @@ function qr_householder_pivoting(A::Matrix{Float64}; tol=1e-12)
 end
 
 
-# ╔═╡ 9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
-function check_qr(A)
+# ╔═╡ 1f1fa94d-cd90-42bf-8480-88cc87e936ac
+md"
+### Ejemplo
+
+"
+
+# ╔═╡ 88225a89-2323-4389-b878-a18ece3c97b1
+X1 \ y1 # Equivalente a y1/X1
+
+# ╔═╡ 9231da04-1d45-40b1-9cc6-ffe9fa9b62be
+qr(X1) \ y1
+
+# ╔═╡ b7dde798-274c-4484-b57a-d0b7f6f3be9d
+md"
+`qr_householder_pivoting(A)` solo devuelve Q, R, Z, pero no realiza la solución del sistema A x = b.
+
+Para compararlo correctamente con X \ y, se añade la función solve_with_qr(A,b)"
+
+# ╔═╡ a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
+function solve_with_qr(A, b)
+    Q, R, Z = qr_householder_pivoting(A)
+    Qtb = Q' * b
+    x_hat = R \ Qtb     # Solución en coordenadas permutadas
+    return Z * x_hat    # Deshacer la permutación de columnas
+end
+
+# ╔═╡ 032e96e4-7ab9-4628-b553-197bee78c56b
+qr_householder_pivoting(X1)
+
+# ╔═╡ 0d1db270-2a92-4b88-8ca7-679026d56987
+solve_with_qr(X1, y1)
+
+# ╔═╡ 07d35c59-b314-4034-92ee-89d69fe286f8
+md" ### Evaluación del algoritmo"
+
+# ╔═╡ 355cab0f-012f-4dff-9cb6-9f7135319487
+function error_norm_qr_householder_pivoting(A)
     Q, R, Z = qr_householder_pivoting(A)
     A_reconstructed = Q * R * Z'
-    println("Norma del error ||A - QRZᵗ|| = ", norm(A - A_reconstructed))
+	return norm(A - A_reconstructed)
+end
+
+# ╔═╡ 9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
+function print_error_norm_qr_householder_pivoting(A)
+    println("Norma del error ||A - QRZᵗ|| = ", error_norm_qr_householder_pivoting(A))
 end
 
 # ╔═╡ 5ad2df44-15af-44e3-b915-0aff64a54310
-md"Dependientes:"
+md"
+#### En presencia de columnas dependientes:
+
+"
 
 # ╔═╡ cbb04c19-ced2-4f83-9559-0a77437c1f70
-A1 = [1.0  2.0  3.0;
-      4.0  5.0  6.0;
-      7.0  8.0  9.0]  # Matriz con columnas linealmente dependientes
-
-# ╔═╡ b40725af-ffe8-4c52-8412-e36ff1626b2c
-check_qr(A1)
+begin
+	print_error_norm_qr_householder_pivoting([
+		1.0  2.0  3.0;
+	    4.0  8.0  6.0;
+	    7.0  14.0  9.0
+	]) 
+end
 
 # ╔═╡ 72ecf964-878f-4aa0-9296-944a204e50d2
-md"Casi dependientes:"
+md"
+#### En presencia de columnas casi dependientes:
+¿Columna casi dependiente?
+"
 
 # ╔═╡ a985046b-3b89-4b81-8626-615ff1efb852
-A2 = [1.0    2.0        3.0;
-      4.0    5.0        6.0;
-      7.0    8.0        9.000001]  # Casi dependientes
+begin
+	print_error_norm_qr_householder_pivoting([
+		1.0  2.0  3.0;
+	    4.0  8.0  6.0;
+	    7.0  14.0001  9.0
+	]) 
+end
 
 # ╔═╡ cb654ecc-8917-4777-9f7e-c051f045d96b
-check_qr(A2)
+begin
+	print_error_norm_qr_householder_pivoting([
+		1.0  2.0  3.0;
+	    4.0  8.0  6.0;
+	    7.0  15.0  9.0
+	]) 
+end
+
+# ╔═╡ 4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
+md"
+#### Variando la casi dependencia de las columnas: 
+Evaluemos los cambios en el error al modificar la casi dependencia de las columnas.
+
+Para esto, tomamos la matriz definida en `getExampleMatrix`. Notemos que si `x` es 0, las primeras dos columnas son dependientes. Podemos modificar `x` para acercarnos o alejarnos de esta dependencia.
+"
+
+# ╔═╡ dea0031c-fff8-467c-81fc-16cd888bfa14
+function getExampleMatrix(x)
+    return [
+		1.0  2.0  3.0;
+		4.0  8.0  6.0;
+		7.0  14.0+x  9.0
+	] 
+end
+
+# ╔═╡ adba9ec6-5fd1-4e09-8974-20f758ae71d7
+begin
+x_long_range = range(-5, 5, length=100)
+
+plot(
+	x_long_range, 
+	[error_norm_qr_householder_pivoting(getExampleMatrix(xi)) for xi in x_long_range], 
+	xlabel="Diferencia `x` entre columnas casi dependientes", 
+	ylabel="Error ||A - QRZᵗ||", 
+	title="Error de reconstrucción QR con pivoteo", 
+	legend=false
+)
+end
+
+# ╔═╡ b0b87d52-8fe9-4094-8aa4-b4f3f279049c
+begin
+x_short_range = range(-.002, .002, length=100)
+
+plot(
+	x_short_range, 
+	[error_norm_qr_householder_pivoting(getExampleMatrix(xi)) for xi in x_short_range], 
+	xlabel="Diferencia `x` entre columnas casi dependientes", 
+	ylabel="Error ||A - QRZᵗ||", 
+	title="Error de reconstrucción QR con pivoteo", 
+	legend=false
+)
+end
+
+# ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
+md"
+## Preguntas de análisis
+Para matrices grandes y dispersas (sparse), compare conceptualmente y computacionalmente los métodos de:
+
+*    Householder
+*    Rotaciones de Givens
+
+💡 Puede usar matrices dispersas generadas con sprand() o matrices reales simples de ejemplo, y puede visualizar el llenado con spy() del paquete SparseArrays o Plots.
+
+"
+
+# ╔═╡ a7210a19-3d9d-494f-8fff-23a9e0fabfd9
+md"
+Responda:
+
+¿Cuál de los dos métodos considera más adecuado para mantener la dispersión en una factorización QR de una matriz rala? 
+
+Justifique su respuesta en términos de:
+* la estructura de la matriz, 
+* las operaciones necesarias y 
+* el patrón de llenado (fill-in).
+
+"
 
 # ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 md"
 ## TO DO
-- [ ] Check sense of algorithm with [Hua Zhou's repo](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting)
+- [ ] Check sense of algorithm with [Hua Zhou's repo](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting) and notion
 - [ ]
 - [ ] Part 2
 - [ ] ChatGPT annex
+"
+
+# ╔═╡ ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
+md"
+### Recursos usados
+- ChatGPT
+- https://www.youtube.com/playlist?list=PLxKgD50sMRvBHxvNPnGQ1kEHlO5y7mSnh Householder Method for QR decomposition playlist by Adam Sperry
+- https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -148,6 +293,7 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
@@ -161,7 +307,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "0bf26116c939d9ca188ad35ac452525c60778944"
+project_hash = "121f96bcea47de180778381d144a00f0d2e65527"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -1275,15 +1421,32 @@ version = "1.4.1+2"
 # ╟─0d4e1dfc-3232-11f0-1549-17244c3a3ae6
 # ╠═c6cbde37-2796-4867-b5f2-a918672749ad
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
-# ╟─dce5fe61-66f5-4e43-a460-4299b8ce21a9
+# ╠═dce5fe61-66f5-4e43-a460-4299b8ce21a9
+# ╠═d74fce97-4be3-4275-8818-4f18982a678e
 # ╠═e92c4212-bbb5-436e-9280-d091671d5f0e
+# ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
+# ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
+# ╠═88225a89-2323-4389-b878-a18ece3c97b1
+# ╠═9231da04-1d45-40b1-9cc6-ffe9fa9b62be
+# ╟─b7dde798-274c-4484-b57a-d0b7f6f3be9d
+# ╠═a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
+# ╠═032e96e4-7ab9-4628-b553-197bee78c56b
+# ╠═0d1db270-2a92-4b88-8ca7-679026d56987
+# ╠═07d35c59-b314-4034-92ee-89d69fe286f8
+# ╠═355cab0f-012f-4dff-9cb6-9f7135319487
 # ╠═9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
-# ╟─5ad2df44-15af-44e3-b915-0aff64a54310
+# ╠═5ad2df44-15af-44e3-b915-0aff64a54310
 # ╠═cbb04c19-ced2-4f83-9559-0a77437c1f70
-# ╠═b40725af-ffe8-4c52-8412-e36ff1626b2c
-# ╟─72ecf964-878f-4aa0-9296-944a204e50d2
+# ╠═72ecf964-878f-4aa0-9296-944a204e50d2
 # ╠═a985046b-3b89-4b81-8626-615ff1efb852
 # ╠═cb654ecc-8917-4777-9f7e-c051f045d96b
+# ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
+# ╠═dea0031c-fff8-467c-81fc-16cd888bfa14
+# ╠═adba9ec6-5fd1-4e09-8974-20f758ae71d7
+# ╠═b0b87d52-8fe9-4094-8aa4-b4f3f279049c
+# ╠═735b730a-f3a5-4f60-96df-39388326b05c
+# ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
+# ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
