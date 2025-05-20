@@ -72,9 +72,82 @@ A=QRZ.
 """
 
 # ╔═╡ d74fce97-4be3-4275-8818-4f18982a678e
-md" ### Algoritmo de ortogonalización de Householder con permutaciones de columnas"
+md"
+### Householder QR con pivoteo
+Implementamos los algoritmos house y Householder QR With Column Pivoting.
+"
 
-# ╔═╡ e92c4212-bbb5-436e-9280-d091671d5f0e
+# ╔═╡ 74ba92e3-08e2-478b-9940-b325c58008e4
+function householder_qr_pivoting(A::AbstractMatrix)
+    A = copy(Matrix(A))  # Trabajamos sobre una copia
+    m, n = size(A)
+
+    c = [dot(A[:, j], A[:, j]) for j in 1:n]  # Normas cuadradas de columnas
+    piv = collect(1:n)  # Permutación inicial
+    r = 0               # Rango estimado
+    τ = maximum(c)      # Umbral para elegir columna pivot
+
+    while τ > 0 && r < n
+        r += 1
+
+        # Encontrar índice k con c(k) = τ (mínimo k en caso de empate)
+        k = findfirst(c[r:n] .== τ) + r - 1
+
+        # Permutar columnas r y k en A, y en c y piv
+        A[:, (r, k)] = A[:, (k, r)]
+        c[(r, k)] = c[(k, r)]
+        piv[(r, k)] = piv[(k, r)]
+
+        # Construir Householder v, β para A[r:m, r]
+        v, β = householder_reflector(A[r:end, r])
+        A[r:end, r] = v
+
+        # Aplicar Householder a A[r:m, r:n]: A = (I - βvvᵗ)A
+        w = β * (A[r:end, r:end]' * v)  # vector temporal
+        A[r:end, r:end] .-= v * w'
+
+        # Guardar vector v en parte inferior de la columna
+        A[r+1:end, r] = v[2:end]
+
+        # Actualizar normas cuadradas de columnas restantes
+        for i in r+1:n
+            c[i] -= A[r, i]^2
+        end
+
+        τ = maximum(c[r+1:end]; init=0.0)
+    end
+
+    return A, piv, r
+end
+
+# ╔═╡ 949ee86c-14d8-4640-897e-c4ce41ad689e
+function house(x::AbstractVector)
+    m = length(x)
+    σ = dot(x[2:end], x[2:end])
+    v = copy(x)
+    v[1] = 1.0
+
+    if σ == 0.0
+        if x[1] >= 0.0
+            β = 0.0
+        else
+            β = -2.0
+        end
+    else
+        μ = sqrt(x[1]^2 + σ)
+        if x[1] <= 0
+            v[1] = x[1] - μ
+        else
+            v[1] = -σ / (x[1] + μ)
+        end
+        β = 2.0 * v[1]^2 / (σ + v[1]^2)
+        v = v / v[1]
+    end
+
+    return v, β
+end
+
+# ╔═╡ ad100da0-c243-4335-9a59-947989b46da7
 function qr_householder_pivoting(A::Matrix{Float64}; tol=1e-12)
     m, n = size(A)
     R = copy(A)
@@ -223,7 +296,7 @@ function getExampleMatrix(x)
 end
 
 # ╔═╡ 0619059d-68dd-4e83-b725-551b5f8a4d0c
-function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0, diff::Float64 = 0.0)
+function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0)
     @assert n ≥ 2 "La matriz debe tener al menos dos columnas"
     
     # Generar una columna aleatoria
@@ -231,7 +304,6 @@ function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0, diff::Float6
     
     # Hacer la segunda columna una combinación lineal de la primera
     col2 = ratio * col1
-	col2[1] += diff
     
     # Generar el resto de columnas (aleatorias)
     other_cols = randn(m, n - 2)
@@ -241,36 +313,54 @@ function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0, diff::Float6
     return A
 end
 
+# ╔═╡ 33904f82-3141-4263-b5d6-1c9f71c91c13
+function mod_dependent_matrix(A::Matrix, diff::Float64)
+	A[1] += diff
+    return A
+end
+
 # ╔═╡ df51f2eb-b090-4084-9fc5-6454e0f0a5df
-gen_dependent_matrix(4,3,diff = 0.1)
-
-# ╔═╡ adba9ec6-5fd1-4e09-8974-20f758ae71d7
 begin
-x_long_range = range(-5, 5, length=100)
-
-plot(
-	x_long_range, 
-	[error_norm_qr_householder_pivoting(getExampleMatrix(xi)) for xi in x_long_range], 
-	xlabel="Diferencia `x` entre columnas casi dependientes", 
-	ylabel="Error ||A - QRZᵗ||", 
-	title="Error de reconstrucción QR con pivoteo", 
-	legend=false
-)
+	AExample1 = gen_dependent_matrix(4,3)
+	AExample2 = gen_dependent_matrix(4,3)
+	AExample3 = gen_dependent_matrix(4,3)
+	display(AExample1)
 end
 
-# ╔═╡ b0b87d52-8fe9-4094-8aa4-b4f3f279049c
-begin
-x_short_range = range(-.002, .002, length=100)
+# ╔═╡ fd71fd5c-8702-4ecb-9bfb-c7d9a97e9b4e
+mod_dependent_matrix(AExample1,5.0)
 
-plot(
-	x_short_range, 
-	[error_norm_qr_householder_pivoting(getExampleMatrix(xi)) for xi in x_short_range], 
-	xlabel="Diferencia `x` entre columnas casi dependientes", 
-	ylabel="Error ||A - QRZᵗ||", 
-	title="Error de reconstrucción QR con pivoteo", 
-	legend=false
-)
+# ╔═╡ 3086fcf9-a97b-4b80-8dcf-ea069c7adccb
+function graph_householder_error_for_almost_dependent_matrices(range)
+	plot(
+		range, 
+		[error_norm_qr_householder_pivoting(mod_dependent_matrix(AExample1,xi)) for xi in range], 
+		xlabel="Diferencia `x` entre columnas casi dependientes", 
+		ylabel="Error ||A - QRZᵗ||", 
+		title="Error de reconstrucción QR con pivoteo", 
+		legend=true,
+		label="AExample1"
+	)
+	plot!(
+		range, 
+		[error_norm_qr_householder_pivoting(mod_dependent_matrix(AExample2,xi)) for xi in range],
+		label="AExample2"
+	)
+	plot!(
+		range, 
+		[error_norm_qr_householder_pivoting(mod_dependent_matrix(AExample3,xi)) for xi in range],
+		label="AExample3"
+	)
 end
+
+# ╔═╡ 26235b65-43b4-47aa-847b-4a8d573b348d
+graph_householder_error_for_almost_dependent_matrices(range(-.2, .2, length=100))
+
+# ╔═╡ f9f4bf3f-c73f-4eac-b430-8cad5e072b94
+graph_householder_error_for_almost_dependent_matrices(range(-.002, .002, length=1000))
+
+# ╔═╡ a8c14878-ee23-45f4-a775-f9dd30545d3f
+graph_householder_error_for_almost_dependent_matrices(range(-.0002, .0002, length=1000))
 
 # ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
 md"
@@ -284,34 +374,67 @@ Para matrices grandes y dispersas (sparse), compare conceptualmente y computacio
 
 "
 
-# ╔═╡ fd5d6a5b-2e6c-4737-8986-7ff8693e1389
-md" ### Comparación conceptual"
+# ╔═╡ cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
+md"
+### Implementación de Givens QR
+Implementamos el algoritmo de descomposición de Givens siguiendo el algoritmo Givens QR del libro Matrix Computations (Golub & Van Loan).
+"
 
-# ╔═╡ f91d6a76-ec4b-49d5-9f0b-3e8511ab707f
-md" ### Comparación computacional"
-
-# ╔═╡ 110ac84e-e8c0-46e8-8bbb-c4944bcc5a31
-md"Primero, generamos una matriz dispersa de ejemplo"
-
-# ╔═╡ e6787d3b-63bf-4d03-8ed3-ec7b45ac9c1b
-A = sprand(1000, 1000, 0.01)  # 1000x1000, con 1% de entradas no nulas
-
-# ╔═╡ e9cf7ddc-994c-4771-971b-8f6200a2ec7c
-spy(A)  # Visualización de la estructura
-
-# ╔═╡ 7371c5eb-8f68-4c2f-b6db-5404ad7f6a6b
-begin
-	Fh = qr(A);
-	@btime qr(A);  # Julia decide internamente qué algoritmo usar
-	Qh = Matrix(Fh.Q)  # Convertimos a densa solo si queremos comparar reconstrucción
-	Rh = Matrix(Fh.R)
+# ╔═╡ d4367062-65de-49a7-9bd4-14851c9b9853
+function givens(a, b)
+    if b == 0
+        return (1.0, 0.0)
+    else
+        r = sqrt(a^2 + b^2)
+        return (a / r, b / r)
+    end
 end
 
-# ╔═╡ a2d6dfc9-13ab-4104-8750-5275dad2af61
-md"### Givens"
+# ╔═╡ a7f97197-6a32-4d06-b35e-25de66c0aab5
+function givens_qr(A)
+    A = copy(Matrix(A))  # Trabajamos con una copia densa para modificarla en sitio
+    m, n = size(A)
+    Q = Matrix(I, m, m)  # Acumulador ortogonal
 
-# ╔═╡ 57a39ffe-c4f1-49f3-bd61-b5a04a168b7b
+    for j in 1:n
+        for i in m:-1:(j + 1)
+            a = A[i-1, j]
+            b = A[i, j]
+            c, s = givens(a, b)
 
+            # Construir Givens implícitamente y aplicar a filas i-1 e i de A (desde columna j en adelante)
+            for k in j:n
+                temp1 = c * A[i-1, k] + s * A[i, k]
+                temp2 = -s * A[i-1, k] + c * A[i, k]
+                A[i-1, k] = temp1
+                A[i, k]   = temp2
+            end
+
+            # Acumular Givens en Q
+            for k in 1:m
+                temp1 = c * Q[k, i-1] + s * Q[k, i]
+                temp2 = -s * Q[k, i-1] + c * Q[k, i]
+                Q[k, i-1] = temp1
+                Q[k, i]   = temp2
+            end
+        end
+    end
+
+    R = triu(A)
+    return Q, R
+end
+
+# ╔═╡ 3df82014-b96d-4b01-bd1e-57d76831a118
+md"
+### Comparación computacional
+Primero, generamos una matriz dispersa de ejemplo
+"
+
+# ╔═╡ b8ddcd70-e7d5-4de7-ac84-ed5a15820b0f
+A = sprand(1000, 1000, 0.01)  # 1000x1000, con 1% de entradas no nulas
+
+# ╔═╡ 08bbb774-3a74-467b-904a-1b287310d174
+spy(A)  # Visualización de la estructura
 
 # ╔═╡ a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 md"
@@ -361,9 +484,9 @@ md"Sin embargo, existe un paper que indica que algunas implementaciones de House
 # ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 md"
 ## TO DO
-- [ ] Check sense of algorithm with [Hua Zhou's repo](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting) and notion
-- [ ]
-- [ ] Part 2
+- [ ] Change householder algorithm for the book version
+- [ ] Practical comparision
+- [ ] Rewrite
 - [ ] ChatGPT annex
 "
 
@@ -374,6 +497,7 @@ md"
 - [Householder Method for QR decomposition playlist by Adam Sperry] (https://www.youtube.com/playlist?list=PLxKgD50sMRvBHxvNPnGQ1kEHlO5y7mSnh)
 - [Computational tools for research in (bio)statistics, including numerical linear algebra and optimization by Dr. Hua Zhou](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting)
 - [Householder reflections versus givens rotations in sparse orthogonal decomposition](https://www.sciencedirect.com/science/article/pii/002437958790111X)
+- Matrix Computations (Golub & Van Loan)
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1512,7 +1636,9 @@ version = "1.4.1+2"
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
 # ╠═dce5fe61-66f5-4e43-a460-4299b8ce21a9
 # ╠═d74fce97-4be3-4275-8818-4f18982a678e
-# ╠═e92c4212-bbb5-436e-9280-d091671d5f0e
+# ╠═74ba92e3-08e2-478b-9940-b325c58008e4
+# ╠═949ee86c-14d8-4640-897e-c4ce41ad689e
+# ╠═ad100da0-c243-4335-9a59-947989b46da7
 # ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
 # ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
 # ╟─b7dde798-274c-4484-b57a-d0b7f6f3be9d
@@ -1534,18 +1660,20 @@ version = "1.4.1+2"
 # ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
 # ╠═dea0031c-fff8-467c-81fc-16cd888bfa14
 # ╠═0619059d-68dd-4e83-b725-551b5f8a4d0c
+# ╠═33904f82-3141-4263-b5d6-1c9f71c91c13
 # ╠═df51f2eb-b090-4084-9fc5-6454e0f0a5df
-# ╠═adba9ec6-5fd1-4e09-8974-20f758ae71d7
-# ╠═b0b87d52-8fe9-4094-8aa4-b4f3f279049c
+# ╠═fd71fd5c-8702-4ecb-9bfb-c7d9a97e9b4e
+# ╠═3086fcf9-a97b-4b80-8dcf-ea069c7adccb
+# ╠═26235b65-43b4-47aa-847b-4a8d573b348d
+# ╠═f9f4bf3f-c73f-4eac-b430-8cad5e072b94
+# ╠═a8c14878-ee23-45f4-a775-f9dd30545d3f
 # ╠═735b730a-f3a5-4f60-96df-39388326b05c
-# ╠═fd5d6a5b-2e6c-4737-8986-7ff8693e1389
-# ╠═f91d6a76-ec4b-49d5-9f0b-3e8511ab707f
-# ╠═110ac84e-e8c0-46e8-8bbb-c4944bcc5a31
-# ╠═e6787d3b-63bf-4d03-8ed3-ec7b45ac9c1b
-# ╠═e9cf7ddc-994c-4771-971b-8f6200a2ec7c
-# ╠═7371c5eb-8f68-4c2f-b6db-5404ad7f6a6b
-# ╠═a2d6dfc9-13ab-4104-8750-5275dad2af61
-# ╠═57a39ffe-c4f1-49f3-bd61-b5a04a168b7b
+# ╠═cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
+# ╠═d4367062-65de-49a7-9bd4-14851c9b9853
+# ╠═a7f97197-6a32-4d06-b35e-25de66c0aab5
+# ╠═3df82014-b96d-4b01-bd1e-57d76831a118
+# ╠═b8ddcd70-e7d5-4de7-ac84-ed5a15820b0f
+# ╠═08bbb774-3a74-467b-904a-1b287310d174
 # ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
 # ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
