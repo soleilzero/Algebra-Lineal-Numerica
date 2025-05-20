@@ -12,13 +12,6 @@ begin
 	using Plots
 end
 
-# ╔═╡ 4e3fa428-1811-41d4-8e0c-4e47985536f7
-begin
-	using Random
-	y1 = randn(5)    # response vector
-	X1 = randn(5, 3) # predictor matrix
-end
-
 # ╔═╡ 4f16bf43-ed9a-4e2b-8e41-600b8a4b0ea4
 md"""
 # Ortogonalización de Householder con Permutaciones + Comparación con Givens en el caso disperso
@@ -74,78 +67,7 @@ A=QRZ.
 # ╔═╡ d74fce97-4be3-4275-8818-4f18982a678e
 md"
 ### Código
-Implementamos los algoritmos house y Householder QR With Column Pivoting.
 "
-
-# ╔═╡ 74ba92e3-08e2-478b-9940-b325c58008e4
-function householder_qr_pivoting(A::AbstractMatrix)
-    A = copy(Matrix(A))  # Trabajamos sobre una copia
-    m, n = size(A)
-
-    c = [dot(A[:, j], A[:, j]) for j in 1:n]  # Normas cuadradas de columnas
-    piv = collect(1:n)  # Permutación inicial
-    r = 0               # Rango estimado
-    τ = maximum(c)      # Umbral para elegir columna pivot
-
-    while τ > 0 && r < n
-        r += 1
-
-        # Encontrar índice k con c(k) = τ (mínimo k en caso de empate)
-        k = findfirst(c[r:n] .== τ) + r - 1
-
-        # Permutar columnas r y k en A, y en c y piv
-        A[:, (r, k)] = A[:, (k, r)]
-        c[(r, k)] = c[(k, r)]
-        piv[(r, k)] = piv[(k, r)]
-
-        # Construir Householder v, β para A[r:m, r]
-        v, β = householder_reflector(A[r:end, r])
-        A[r:end, r] = v
-
-        # Aplicar Householder a A[r:m, r:n]: A = (I - βvvᵗ)A
-        w = β * (A[r:end, r:end]' * v)  # vector temporal
-        A[r:end, r:end] .-= v * w'
-
-        # Guardar vector v en parte inferior de la columna
-        A[r+1:end, r] = v[2:end]
-
-        # Actualizar normas cuadradas de columnas restantes
-        for i in r+1:n
-            c[i] -= A[r, i]^2
-        end
-
-        τ = maximum(c[r+1:end]; init=0.0)
-    end
-
-    return A, piv, r
-end
-
-# ╔═╡ 949ee86c-14d8-4640-897e-c4ce41ad689e
-function house(x::AbstractVector)
-    m = length(x)
-    σ = dot(x[2:end], x[2:end])
-    v = copy(x)
-    v[1] = 1.0
-
-    if σ == 0.0
-        if x[1] >= 0.0
-            β = 0.0
-        else
-            β = -2.0
-        end
-    else
-        μ = sqrt(x[1]^2 + σ)
-        if x[1] <= 0
-            v[1] = x[1] - μ
-        else
-            v[1] = -σ / (x[1] + μ)
-        end
-        β = 2.0 * v[1]^2 / (σ + v[1]^2)
-        v = v / v[1]
-    end
-
-    return v, β
-end
 
 # ╔═╡ ad100da0-c243-4335-9a59-947989b46da7
 function qr_householder_pivoting(A; tol=1e-12)
@@ -190,8 +112,13 @@ end
 # ╔═╡ 1f1fa94d-cd90-42bf-8480-88cc87e936ac
 md"
 ### Ejemplo
-
 "
+
+# ╔═╡ 4e3fa428-1811-41d4-8e0c-4e47985536f7
+begin
+	y1 = randn(5)    # response vector
+	X1 = randn(5, 3) # predictor matrix
+end
 
 # ╔═╡ b7dde798-274c-4484-b57a-d0b7f6f3be9d
 md"
@@ -207,14 +134,11 @@ function solve_with_qr(A, b)
     return Z * x_hat    # Deshacer la permutación de columnas
 end
 
-# ╔═╡ 032e96e4-7ab9-4628-b553-197bee78c56b
-qr_householder_pivoting(X1)
-
 # ╔═╡ 0d1db270-2a92-4b88-8ca7-679026d56987
 solve_with_qr(X1, y1)
 
 # ╔═╡ af9f5df5-64aa-4406-a74a-4ebe59952bb4
-md"Vemos que la respuesta coincide con X\y y qr(X)\y"
+md"Veamos que la respuesta de solve_with_qr coincide con X\y y qr(X)\y"
 
 # ╔═╡ 88225a89-2323-4389-b878-a18ece3c97b1
 X1 \ y1 # Equivalente a y1/X1
@@ -223,7 +147,12 @@ X1 \ y1 # Equivalente a y1/X1
 qr(X1) \ y1
 
 # ╔═╡ 07d35c59-b314-4034-92ee-89d69fe286f8
-md" ### Evaluación del algoritmo"
+md"
+### Evaluación del error del algoritmo
+En esta sección analizaremos si el error del algoritmo cambia si en la matriz hay columnas dependientes o casi dependientes.
+
+Para evaluar el error utilizaremos `error_norm_qr_householder_pivoting`, la cual halla la diferencia entre la matriz original y la matriz reconstruida a partir de la descomposición QR generada por `qr_householder_pivoting`.
+"
 
 # ╔═╡ 355cab0f-012f-4dff-9cb6-9f7135319487
 function error_norm_qr_householder_pivoting(A)
@@ -240,7 +169,6 @@ end
 # ╔═╡ 5ad2df44-15af-44e3-b915-0aff64a54310
 md"
 #### En presencia de columnas dependientes:
-
 "
 
 # ╔═╡ cbb04c19-ced2-4f83-9559-0a77437c1f70
@@ -282,34 +210,33 @@ md"El error no es significativamente diferente si las columnas son casi dependie
 md"
 #### Variando la casi dependencia de las columnas: 
 Evaluemos los cambios en el error al modificar la casi dependencia de las columnas.
-
-Para esto, tomamos la matriz definida en `getExampleMatrix`. Notemos que si `x` es 0, las primeras dos columnas son dependientes. Podemos modificar `x` para acercarnos o alejarnos de esta dependencia.
 "
 
-# ╔═╡ dea0031c-fff8-467c-81fc-16cd888bfa14
-function getExampleMatrix(x)
-    return [
-		1.0  2.0  3.0;
-		4.0  8.0  6.0;
-		7.0  14.0+x  9.0
-	] 
-end
+# ╔═╡ b323c5a5-46d7-4b7a-a019-58d8361dda1b
+md"
+Para esto, primero generamos matrices cuya primera y última columnas son dependientes con `gen_dependent_matrix`.
+Luego, con la función `mod_dependent_matrix` modificamos uno de sus valores para que modificar el primer valor de la primera columna, tal que las columnas mencionadas sean más o menos casi dependientes.
+Por último, graficamos el error de la reconstrucción QR con `error_norm_qr_householder_pivoting`
+"
+
+# ╔═╡ 80928dfb-12c8-4310-b7fd-6f922bbc16b1
+md"El pivoteo del algoritmo aprovecha la casi dependencia de columnas, al procesar las columnas casi dependientes primero y más rápido. Por lo cual, para evaluar la diferencia entre la presencia de columnas casi dependientes o no, es importante que no sean las primeras columnas las dependientes."
 
 # ╔═╡ 0619059d-68dd-4e83-b725-551b5f8a4d0c
 function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0)
     @assert n ≥ 2 "La matriz debe tener al menos dos columnas"
     
     # Generar una columna aleatoria
-    col1 = randn(m)
+    first_col = randn(m)
     
     # Hacer la segunda columna una combinación lineal de la primera
-    col2 = ratio * col1
+    last_col = ratio * first_col
     
     # Generar el resto de columnas (aleatorias)
     other_cols = randn(m, n - 2)
     
     # Construir la matriz concatenando las columnas
-    A = hcat(col1, col2, other_cols)
+    A = hcat(first_col, other_cols, last_col)
     return A
 end
 
@@ -332,12 +259,13 @@ mod_dependent_matrix(AExample1,5.0)
 
 # ╔═╡ 3086fcf9-a97b-4b80-8dcf-ea069c7adccb
 function graph_householder_error_for_almost_dependent_matrices(range)
+	title = "Error para diferencias de hasta " * string(last(range))
 	plot(
 		range, 
 		[error_norm_qr_householder_pivoting(mod_dependent_matrix(AExample1,xi)) for xi in range], 
 		xlabel="Diferencia `x` entre columnas casi dependientes", 
 		ylabel="Error ||A - QRZᵗ||", 
-		title="Error de reconstrucción QR con pivoteo", 
+		title=title, 
 		legend=true,
 		label="AExample1"
 	)
@@ -353,14 +281,67 @@ function graph_householder_error_for_almost_dependent_matrices(range)
 	)
 end
 
-# ╔═╡ 26235b65-43b4-47aa-847b-4a8d573b348d
-graph_householder_error_for_almost_dependent_matrices(range(-.2, .2, length=100))
+# ╔═╡ a0ac0068-0638-4a71-af95-8f78b2c14e32
+graph_householder_error_for_almost_dependent_matrices(range(-5, 5, length=500))
 
 # ╔═╡ f9f4bf3f-c73f-4eac-b430-8cad5e072b94
-graph_householder_error_for_almost_dependent_matrices(range(-.002, .002, length=1000))
+graph_householder_error_for_almost_dependent_matrices(range(-.5, .5, length=500))
 
 # ╔═╡ a8c14878-ee23-45f4-a775-f9dd30545d3f
-graph_householder_error_for_almost_dependent_matrices(range(-.0002, .0002, length=1000))
+graph_householder_error_for_almost_dependent_matrices(range(-.001, .001, length=500))
+
+# ╔═╡ 8898e3d0-3bf4-42c7-bb38-cbec5c2a0692
+graph_householder_error_for_almost_dependent_matrices(range(-.00001, .00001, length=500))
+
+# ╔═╡ e58f7432-b071-48c2-8683-76d7abbad4f1
+md"
+Al comparar las gráficas de los diferentes rangos, podemos ver que el valor máximo disminuye a medida que disminuye el rango.
+El error máximo para diferencias de hasta .5 está alrededor de $9.0*10⁻14$, el de .001 y 0.00001 está en $8.0*10^{-15}$
+"
+
+# ╔═╡ dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
+md"
+### Evaluación del tiempo del algoritmo
+En esta sección analizaremos si el tiempo del algoritmo cambia si en la matriz hay columnas dependientes o casi dependientes.
+"
+
+# ╔═╡ f3ff1c1e-84b4-47d9-b186-d00178c6c6de
+time_qr_householder_pivoting_matrix_sizes = [5, 10]
+
+# ╔═╡ 469c6587-8891-41c8-a62b-1bb835355e44
+function time_qr_householder_pivoting(A)
+	return @belapsed qr_householder_pivoting($A)
+end
+
+# ╔═╡ 933757b2-8b95-467b-87d0-8d4d4a2cbe8a
+time_qr_householder_pivoting(gen_dependent_matrix(4,3))
+
+# ╔═╡ dcb96a87-c14c-4f6d-be27-e4a54a20e198
+function graph_householder_time_for_almost_dependent_matrices(range)
+	title = "Error para diferencias de hasta " * string(last(range))
+	plot(
+		range, 
+		[time_qr_householder_pivoting(mod_dependent_matrix(AExample1,xi)) for xi in range], 
+		xlabel="Diferencia `x` entre columnas casi dependientes", 
+		ylabel="Error ||A - QRZᵗ||", 
+		title=title, 
+		legend=true,
+		label="AExample1"
+	)
+	plot!(
+		range, 
+		[time_qr_householder_pivoting(mod_dependent_matrix(AExample2,xi)) for xi in range],
+		label="AExample2"
+	)
+	plot!(
+		range, 
+		[time_qr_householder_pivoting(mod_dependent_matrix(AExample3,xi)) for xi in range],
+		label="AExample3"
+	)
+end
+
+# ╔═╡ 5b842aa4-c3d3-46e9-8049-2efe1583fec6
+graph_householder_time_for_almost_dependent_matrices(range(-5, 5, length=500))
 
 # ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
 md"
@@ -424,60 +405,33 @@ function givens_qr(A)
     return Q, R
 end
 
-# ╔═╡ d6da3e26-dfc2-480c-bbfb-2fac130af8a3
-n=5
+# ╔═╡ 2e5b592c-2e88-4552-9788-a31d7be04ad1
+md"
+### Comparación conceptual
+Recordemos que:
 
-# ╔═╡ 4a722520-c4be-42c8-8063-635008d82f67
-AX = randn(n, n)
+La *transformación de Householder* implica una reflexión ortogonal $H = I - 2 \frac{vv^\top}{v^\top v}$ que anula simultáneamente todos los elementos debajo de una entrada de la columna. 
 
-# ╔═╡ dbc9cc32-bc9c-4554-a0ec-9bbf60f6e2ba
-givens_qr(AX)
+La *rotación de Givens* implica una rotación ortogonal en el plano $(i, j)$ que anula un único elemento mediante una transformación local.
+
+| **Criterio**                                                    | **Transformaciones de Householder**                                                                                                         | **Rotaciones de Givens**                                                                                           | **Ganador (para matrices dispersas)**                                                      |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| **Estructura de los operadores ortogonales**                    | Se requiere almacenar vectores reflejados ($v$), usualmente densos. Las matrices $H_k$ no son dispersas.                                    | Las rotaciones son representadas por ángulos $(c, s)$; no se almacenan matrices completas.                         | **Givens** (mejor almacenamiento)                                                          |
+| **Alcance de cada transformación**                              | Global: afecta toda la submatriz inferior derecha.                                                                                          | Local: modifica únicamente dos filas (i, j) de la matriz.                                                          | **Givens** (mejor preservación local)                                                      |
+| **Preservación de la estructura dispersa**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en muchas posiciones.                             | Buena: al modificar solo dos filas, el patrón de dispersión se mantiene en gran medida.                            | **Givens** (preserva mejor la dispersión)                                                  |
+| **Fill-in (llenado de ceros)**                                  | Alto: cada paso puede transformar columnas y filas escasamente pobladas en densas.                                                          | Bajo: el llenado se restringe al soporte conjunto de las filas involucradas.                                       | **Givens** (mínimo fill-in)                                                                |                                             |
+| **Costo computacional por transformación**                      | $\mathcal{O}(mn)$ por reflexión (en el caso general), pues afecta múltiples columnas y filas.                                               | $\mathcal{O}(n)$ por rotación (en promedio), afectando solo dos filas.                                             | **Givens** (mejor costo local)                                                             |
+| **Número total de transformaciones**                            | $\min(m, n)$: una reflexión por columna.                                                                                                    | Hasta $\frac{n(n-1)}{2}$ en el peor caso (aunque muchas operaciones pueden omitirse si los elementos ya son cero). | **Empate** (Householder usa menos transformaciones, Givens puede optimizarse en dispersos) |
+"
 
 # ╔═╡ 3df82014-b96d-4b01-bd1e-57d76831a118
 md"
 ### Comparación computacional
-Primero, generamos una matriz dispersa de ejemplo
+Vamos a realizar la comparación de ambos algoritmos para matrices densas y dispersas de diferentes tamaños
 "
 
-# ╔═╡ 7ee7684f-ff8d-4c2d-aa0d-a30d19e16fe8
-begin
-	AR = randn(3, 3)
-	a = @btime givens_qr($AR)
-	display(a)
-end
-
-# ╔═╡ e92436df-9ab2-4306-8088-947cb0087962
-# Ejemplo para matriz densa
-function compare_qr_dense(n)
-    A = randn(n, n)
-    println("n = $n")
-    println("Givens:")
-    @btime givens_qr($A)
-    println("Householder con pivoteo:")
-    @btime qr_householder_pivoting($A) 
-end
-
-
-# ╔═╡ 3c44536b-2922-4ee6-a52f-e1d1262bfe35
-compare_qr_dense(4)
-
-# ╔═╡ 6fe6e55d-8916-4f78-a333-4112ff27a7fd
-# Ejemplo para matriz dispersa
-function compare_qr_sparse(n, density=0.01)
-    A = sprand(n, n, density)
-    println("n = $n, dispersa")
-    println("Givens:")
-    @btime givens_qr(Matrix($A))
-    println("Householder con pivoteo:")
-    @btime qr_householder_pivoting(Matrix($A))
-end
-
-
-# ╔═╡ ce3873e4-a8b3-4a31-ace5-da41925c5a54
-compare_qr_sparse(4)
-
 # ╔═╡ e03a43e2-78da-4e19-99f8-aa694bf33675
-ns = 100:2000:10100  # Tamaños de matrices
+ns = 10:100:1010  # Tamaños de matrices
 
 # ╔═╡ 37ffd6f2-07f6-411f-b7c1-78dec8c19ff6
 function benchmark_qr_methods(ns, density=nothing)
@@ -506,6 +460,9 @@ end
 md" #### Para matrices densas"
 
 # ╔═╡ a1866f28-21ee-40c5-9dc3-a73ef1a098e2
+
+
+# ╔═╡ bf43a9d8-62de-47e6-bf60-2111f9a01b03
 times_givens_dense, times_house_dense = benchmark_qr_methods(ns)
 
 # ╔═╡ cd9e41cc-eca0-4db3-a675-80a20397149b
@@ -514,34 +471,14 @@ begin
 	plot!(ns, times_house_dense, label="Householder QR with Pivoting", lw=2, marker=:square)
 	xlabel!("Matrix Size (n × n)")
 	ylabel!("Execution Time (seconds)")
-	title!("QR Decomposition Time Comparison")
+	title!("QR Decomposition Time for dense matrices")
 	
 end
 
-# ╔═╡ 0fbb1d97-0823-4fac-8caa-550fb31084f7
+# ╔═╡ 36b4511c-6531-46e4-bc66-a4cc75fbb87f
 md" #### Para matrices dispersas"
 
-# ╔═╡ ef6150de-78e2-4e6a-97c9-18bc23df7418
-function benchmark_qr_methods_sparse(ns, density=.1)
-    times_givens = Float64[]
-    times_house = Float64[]
-
-    for n in ns
-        A = sprand(n, n, density)
-
-        # Medición de tiempo
-        t_givens = @belapsed givens_qr($A)
-        t_house  = @belapsed qr_householder_pivoting($A)
-
-        push!(times_givens, t_givens)
-        push!(times_house, t_house)
-    end
-
-    return times_givens, times_house
-end
-
-
-# ╔═╡ 53ffc0bf-f8cb-4b18-b971-803390d99a06
+# ╔═╡ 41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 times_givens_sparse, times_house_sparse = benchmark_qr_methods(ns, .1)
 
 # ╔═╡ 20d9b30e-b85f-4087-a74f-d452a13c325f
@@ -550,7 +487,7 @@ begin
 	plot!(ns, times_house_sparse, label="Householder QR with Pivoting", lw=2, marker=:square)
 	xlabel!("Matrix Size (n × n)")
 	ylabel!("Execution Time (seconds)")
-	title!("QR Decomposition Time Comparison")
+	title!("QR Decomposition Time for sparse matrices")
 	
 end
 
@@ -573,11 +510,18 @@ Justifique su respuesta en términos de:
 
 # ╔═╡ 9cce2e64-c3ee-461d-98f0-b7a3460046e8
 md"
-Recordemos que:
+Para **matrices dispersas**, las **rotaciones de Givens** son más adecuadas si el objetivo es **preservar la estructura dispersa** y **minimizar el llenado (fill-in)** durante la factorización QR.
 
-La *transformación de Householder* implica una reflexión ortogonal $H = I - 2 \frac{vv^\top}{v^\top v}$ que anula simultáneamente todos los elementos debajo de una entrada de la columna. 
+**Justificación:**
 
-La *rotación de Givens* implica una rotación ortogonal en el plano $(i, j)$ que anula un único elemento mediante una transformación local.
+1. **Estructura local:** Givens modifica únicamente dos filas por vez. Esto evita que un cero en una fila se transforme en un valor no nulo por la propagación de una transformación global, como ocurre en Householder.
+
+2. **Preservación del patrón disperso:** Las transformaciones de Givens pueden ser diseñadas para aprovechar los ceros ya presentes, omitiendo operaciones innecesarias. Esto es especialmente útil en aplicaciones como resolución de sistemas dispersos o álgebra lineal estructurada.
+
+3. **Control de llenado:** El llenado que se introduce por rotaciones de Givens está restringido al soporte conjunto de las filas que se modifican. En contraste, una sola reflexión de Householder puede densificar completamente una matriz dispersa, generando costos de almacenamiento y computación más altos.
+
+4. **Aplicabilidad práctica:** Aunque en teoría Householder es más eficiente para matrices densas (pues anula toda una columna de una vez), en matrices dispersas este “alcance” se vuelve perjudicial. En la práctica, Givens permite conservar ventajas estructurales que podrían ser esenciales, por ejemplo, en métodos iterativos o sistemas simbólicos.
+
 "
 
 # ╔═╡ 977d0390-19a3-4bcf-ae75-8c6efdd38a85
@@ -586,27 +530,14 @@ Ambos pueden reemplazar ceros. Pero Givens modifica menos valores en cada paso, 
 (Reemplazar Preservación con Alcance de cada transformación y Fill-in)
 "
 
-# ╔═╡ 2e5b592c-2e88-4552-9788-a31d7be04ad1
-md"
-
-| **Criterio**                                                    | **Transformaciones de Householder**                                                                                                         | **Rotaciones de Givens**                                                                                           | **Ganador (para matrices dispersas)**                                                      |
-| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| **Estructura de los operadores ortogonales**                    | Se requiere almacenar vectores reflejados ($v$), usualmente densos. Las matrices $H_k$ no son dispersas.                                    | Las rotaciones son representadas por ángulos $(c, s)$; no se almacenan matrices completas.                         | **Givens** (mejor almacenamiento)                                                          |
-| **Alcance de cada transformación**                              | Global: afecta toda la submatriz inferior derecha.                                                                                          | Local: modifica únicamente dos filas (i, j) de la matriz.                                                          | **Givens** (mejor preservación local)                                                      |
-| **Preservación de la estructura dispersa**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en muchas posiciones.                             | Buena: al modificar solo dos filas, el patrón de dispersión se mantiene en gran medida.                            | **Givens** (preserva mejor la dispersión)                                                  |
-| **Fill-in (llenado de ceros)**                                  | Alto: cada paso puede transformar columnas y filas escasamente pobladas en densas.                                                          | Bajo: el llenado se restringe al soporte conjunto de las filas involucradas.                                       | **Givens** (mínimo fill-in)                                                                |                                             |
-| **Costo computacional por transformación**                      | $\mathcal{O}(mn)$ por reflexión (en el caso general), pues afecta múltiples columnas y filas.                                               | $\mathcal{O}(n)$ por rotación (en promedio), afectando solo dos filas.                                             | **Givens** (mejor costo local)                                                             |
-| **Número total de transformaciones**                            | $\min(m, n)$: una reflexión por columna.                                                                                                    | Hasta $\frac{n(n-1)}{2}$ en el peor caso (aunque muchas operaciones pueden omitirse si los elementos ya son cero). | **Empate** (Householder usa menos transformaciones, Givens puede optimizarse en dispersos) |
-"
-
 # ╔═╡ c7927f9f-a505-4099-b0e4-3bfedab1acb1
 md"Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas."
 
 # ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 md"
 ## TO DO
-- [ ] Change householder algorithm for the book version
-- [ ] Practical comparision
+- [ ] time householder: change matrix size
+- [ ] spy
 - [ ] Rewrite
 - [ ] ChatGPT annex
 "
@@ -621,13 +552,50 @@ md"
 - Matrix Computations (Golub & Van Loan)
 "
 
+# ╔═╡ ef6150de-78e2-4e6a-97c9-18bc23df7418
+function benchmark_qr_methods_sparse(ns, density=.1)
+    times_givens = Float64[]
+    times_house = Float64[]
+
+    for n in ns
+        A = sprand(n, n, density)
+
+        # Medición de tiempo
+        t_givens = @belapsed givens_qr($A)
+        t_house  = @belapsed qr_householder_pivoting($A)
+
+        push!(times_givens, t_givens)
+        push!(times_house, t_house)
+    end
+
+    return times_givens, times_house
+end
+
+
+# ╔═╡ f0d694a0-12ca-4438-ac7c-6f10f6855b10
+function benchmark_qr_methods_sparse(ns, density=.1)
+    times_givens = Float64[]
+    times_house = Float64[]
+
+    for n in ns
+        A = sprand(n, n, density)
+
+        # Medición de tiempo
+        t_matrix1  = @belapsed qr_householder_pivoting($A)
+
+        push!(times_givens, t_givens)
+        push!(times_house, t_house)
+    end
+
+    return times_givens, times_house
+end
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
@@ -641,7 +609,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "121f96bcea47de180778381d144a00f0d2e65527"
+project_hash = "0bf26116c939d9ca188ad35ac452525c60778944"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -1757,14 +1725,11 @@ version = "1.4.1+2"
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
 # ╠═dce5fe61-66f5-4e43-a460-4299b8ce21a9
 # ╠═d74fce97-4be3-4275-8818-4f18982a678e
-# ╠═74ba92e3-08e2-478b-9940-b325c58008e4
-# ╠═949ee86c-14d8-4640-897e-c4ce41ad689e
 # ╠═ad100da0-c243-4335-9a59-947989b46da7
 # ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
 # ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
 # ╟─b7dde798-274c-4484-b57a-d0b7f6f3be9d
 # ╠═a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
-# ╠═032e96e4-7ab9-4628-b553-197bee78c56b
 # ╠═0d1db270-2a92-4b88-8ca7-679026d56987
 # ╠═af9f5df5-64aa-4406-a74a-4ebe59952bb4
 # ╠═88225a89-2323-4389-b878-a18ece3c97b1
@@ -1779,42 +1744,45 @@ version = "1.4.1+2"
 # ╠═cb654ecc-8917-4777-9f7e-c051f045d96b
 # ╠═a52dc169-d858-484a-8ece-b6c03ba7933f
 # ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
-# ╠═dea0031c-fff8-467c-81fc-16cd888bfa14
+# ╠═b323c5a5-46d7-4b7a-a019-58d8361dda1b
+# ╠═80928dfb-12c8-4310-b7fd-6f922bbc16b1
 # ╠═0619059d-68dd-4e83-b725-551b5f8a4d0c
 # ╠═33904f82-3141-4263-b5d6-1c9f71c91c13
 # ╠═df51f2eb-b090-4084-9fc5-6454e0f0a5df
 # ╠═fd71fd5c-8702-4ecb-9bfb-c7d9a97e9b4e
 # ╠═3086fcf9-a97b-4b80-8dcf-ea069c7adccb
-# ╠═26235b65-43b4-47aa-847b-4a8d573b348d
+# ╠═a0ac0068-0638-4a71-af95-8f78b2c14e32
 # ╠═f9f4bf3f-c73f-4eac-b430-8cad5e072b94
 # ╠═a8c14878-ee23-45f4-a775-f9dd30545d3f
+# ╠═8898e3d0-3bf4-42c7-bb38-cbec5c2a0692
+# ╠═e58f7432-b071-48c2-8683-76d7abbad4f1
+# ╠═dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
+# ╠═f3ff1c1e-84b4-47d9-b186-d00178c6c6de
+# ╠═933757b2-8b95-467b-87d0-8d4d4a2cbe8a
+# ╠═f0d694a0-12ca-4438-ac7c-6f10f6855b10
+# ╠═469c6587-8891-41c8-a62b-1bb835355e44
+# ╠═dcb96a87-c14c-4f6d-be27-e4a54a20e198
+# ╠═5b842aa4-c3d3-46e9-8049-2efe1583fec6
 # ╠═735b730a-f3a5-4f60-96df-39388326b05c
 # ╠═cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
 # ╠═d4367062-65de-49a7-9bd4-14851c9b9853
 # ╠═a7f97197-6a32-4d06-b35e-25de66c0aab5
-# ╠═d6da3e26-dfc2-480c-bbfb-2fac130af8a3
-# ╠═4a722520-c4be-42c8-8063-635008d82f67
-# ╠═dbc9cc32-bc9c-4554-a0ec-9bbf60f6e2ba
+# ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
 # ╠═3df82014-b96d-4b01-bd1e-57d76831a118
-# ╠═7ee7684f-ff8d-4c2d-aa0d-a30d19e16fe8
-# ╠═e92436df-9ab2-4306-8088-947cb0087962
-# ╠═3c44536b-2922-4ee6-a52f-e1d1262bfe35
-# ╠═6fe6e55d-8916-4f78-a333-4112ff27a7fd
-# ╠═ce3873e4-a8b3-4a31-ace5-da41925c5a54
 # ╠═e03a43e2-78da-4e19-99f8-aa694bf33675
 # ╠═37ffd6f2-07f6-411f-b7c1-78dec8c19ff6
 # ╠═8dfc99fb-ab20-46f0-baef-464111c78ee0
 # ╠═a1866f28-21ee-40c5-9dc3-a73ef1a098e2
+# ╠═bf43a9d8-62de-47e6-bf60-2111f9a01b03
 # ╠═cd9e41cc-eca0-4db3-a675-80a20397149b
-# ╠═0fbb1d97-0823-4fac-8caa-550fb31084f7
+# ╠═36b4511c-6531-46e4-bc66-a4cc75fbb87f
 # ╠═ef6150de-78e2-4e6a-97c9-18bc23df7418
-# ╠═53ffc0bf-f8cb-4b18-b971-803390d99a06
+# ╠═41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 # ╠═20d9b30e-b85f-4087-a74f-d452a13c325f
 # ╠═65e755c0-3910-4427-b9d1-663e4539a893
 # ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
 # ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
-# ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
 # ╠═c7927f9f-a505-4099-b0e4-3bfedab1acb1
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
