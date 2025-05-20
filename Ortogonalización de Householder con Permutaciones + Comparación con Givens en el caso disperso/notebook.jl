@@ -65,7 +65,7 @@ md""" ## Set up"""
 
 # ╔═╡ dce5fe61-66f5-4e43-a460-4299b8ce21a9
 md"""
-## Implementación
+## Implementación de Householder QR con pivoteo
 Implemente en Julia el algoritmo de ortogonalización de Householder con permutaciones de columnas, es decir, el algoritmo de factorización QR con pivoteo columnar parcial:
 A=QRZ.
 🔍 Evalúe su algoritmo en presencia de columnas linealmente dependientes o casidependientes.
@@ -73,7 +73,7 @@ A=QRZ.
 
 # ╔═╡ d74fce97-4be3-4275-8818-4f18982a678e
 md"
-### Householder QR con pivoteo
+### Código
 Implementamos los algoritmos house y Householder QR With Column Pivoting.
 "
 
@@ -148,7 +148,7 @@ function house(x::AbstractVector)
 end
 
 # ╔═╡ ad100da0-c243-4335-9a59-947989b46da7
-function qr_householder_pivoting(A::Matrix{Float64}; tol=1e-12)
+function qr_householder_pivoting(A; tol=1e-12)
     m, n = size(A)
     R = copy(A)
     Q = Matrix{Float64}(I, m, m)
@@ -394,7 +394,7 @@ end
 function givens_qr(A)
     A = copy(Matrix(A))  # Trabajamos con una copia densa para modificarla en sitio
     m, n = size(A)
-    Q = Matrix(I, m, m)  # Acumulador ortogonal
+    Q = Matrix(1.0I, m, m)  # Acumulador ortogonal
 
     for j in 1:n
         for i in m:-1:(j + 1)
@@ -424,17 +424,141 @@ function givens_qr(A)
     return Q, R
 end
 
+# ╔═╡ d6da3e26-dfc2-480c-bbfb-2fac130af8a3
+n=5
+
+# ╔═╡ 4a722520-c4be-42c8-8063-635008d82f67
+AX = randn(n, n)
+
+# ╔═╡ dbc9cc32-bc9c-4554-a0ec-9bbf60f6e2ba
+givens_qr(AX)
+
 # ╔═╡ 3df82014-b96d-4b01-bd1e-57d76831a118
 md"
 ### Comparación computacional
 Primero, generamos una matriz dispersa de ejemplo
 "
 
-# ╔═╡ b8ddcd70-e7d5-4de7-ac84-ed5a15820b0f
-A = sprand(1000, 1000, 0.01)  # 1000x1000, con 1% de entradas no nulas
+# ╔═╡ 7ee7684f-ff8d-4c2d-aa0d-a30d19e16fe8
+begin
+	AR = randn(3, 3)
+	a = @btime givens_qr($AR)
+	display(a)
+end
 
-# ╔═╡ 08bbb774-3a74-467b-904a-1b287310d174
-spy(A)  # Visualización de la estructura
+# ╔═╡ e92436df-9ab2-4306-8088-947cb0087962
+# Ejemplo para matriz densa
+function compare_qr_dense(n)
+    A = randn(n, n)
+    println("n = $n")
+    println("Givens:")
+    @btime givens_qr($A)
+    println("Householder con pivoteo:")
+    @btime qr_householder_pivoting($A) 
+end
+
+
+# ╔═╡ 3c44536b-2922-4ee6-a52f-e1d1262bfe35
+compare_qr_dense(4)
+
+# ╔═╡ 6fe6e55d-8916-4f78-a333-4112ff27a7fd
+# Ejemplo para matriz dispersa
+function compare_qr_sparse(n, density=0.01)
+    A = sprand(n, n, density)
+    println("n = $n, dispersa")
+    println("Givens:")
+    @btime givens_qr(Matrix($A))
+    println("Householder con pivoteo:")
+    @btime qr_householder_pivoting(Matrix($A))
+end
+
+
+# ╔═╡ ce3873e4-a8b3-4a31-ace5-da41925c5a54
+compare_qr_sparse(4)
+
+# ╔═╡ e03a43e2-78da-4e19-99f8-aa694bf33675
+ns = 100:2000:10100  # Tamaños de matrices
+
+# ╔═╡ 37ffd6f2-07f6-411f-b7c1-78dec8c19ff6
+function benchmark_qr_methods(ns, density=nothing)
+    times_givens = Float64[]
+    times_house = Float64[]
+
+    for n in ns
+		if density==nothing
+	        A = randn(n, n)
+		else
+			A = sprand(n, n, density)
+		end
+        # Medición de tiempo
+        t_givens = @belapsed givens_qr($A)
+        t_house  = @belapsed qr_householder_pivoting($A)
+
+        push!(times_givens, t_givens)
+        push!(times_house, t_house)
+    end
+
+    return times_givens, times_house
+end
+
+
+# ╔═╡ 8dfc99fb-ab20-46f0-baef-464111c78ee0
+md" #### Para matrices densas"
+
+# ╔═╡ a1866f28-21ee-40c5-9dc3-a73ef1a098e2
+times_givens_dense, times_house_dense = benchmark_qr_methods(ns)
+
+# ╔═╡ cd9e41cc-eca0-4db3-a675-80a20397149b
+begin
+	plot(ns, times_givens_dense, label="Givens QR", lw=2, marker=:o)
+	plot!(ns, times_house_dense, label="Householder QR with Pivoting", lw=2, marker=:square)
+	xlabel!("Matrix Size (n × n)")
+	ylabel!("Execution Time (seconds)")
+	title!("QR Decomposition Time Comparison")
+	
+end
+
+# ╔═╡ 0fbb1d97-0823-4fac-8caa-550fb31084f7
+md" #### Para matrices dispersas"
+
+# ╔═╡ ef6150de-78e2-4e6a-97c9-18bc23df7418
+function benchmark_qr_methods_sparse(ns, density=.1)
+    times_givens = Float64[]
+    times_house = Float64[]
+
+    for n in ns
+        A = sprand(n, n, density)
+
+        # Medición de tiempo
+        t_givens = @belapsed givens_qr($A)
+        t_house  = @belapsed qr_householder_pivoting($A)
+
+        push!(times_givens, t_givens)
+        push!(times_house, t_house)
+    end
+
+    return times_givens, times_house
+end
+
+
+# ╔═╡ 53ffc0bf-f8cb-4b18-b971-803390d99a06
+times_givens_sparse, times_house_sparse = benchmark_qr_methods(ns, .1)
+
+# ╔═╡ 20d9b30e-b85f-4087-a74f-d452a13c325f
+begin
+	plot(ns, times_givens_sparse, label="Givens QR", lw=2, marker=:o)
+	plot!(ns, times_house_sparse, label="Householder QR with Pivoting", lw=2, marker=:square)
+	xlabel!("Matrix Size (n × n)")
+	ylabel!("Execution Time (seconds)")
+	title!("QR Decomposition Time Comparison")
+	
+end
+
+# ╔═╡ 65e755c0-3910-4427-b9d1-663e4539a893
+md" #### Resultados
+En el experimento, el algoritmo de Givens QR es más rápido que el de Householder QR con pivoteo. 
+Para las matrices densas, es apróximadamente el doble del tiempo. Sin embargo, para las matrices dispersas, la diferencia parece ser exponencial.
+"
 
 # ╔═╡ a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 md"
@@ -474,9 +598,6 @@ md"
 | **Costo computacional por transformación**                      | $\mathcal{O}(mn)$ por reflexión (en el caso general), pues afecta múltiples columnas y filas.                                               | $\mathcal{O}(n)$ por rotación (en promedio), afectando solo dos filas.                                             | **Givens** (mejor costo local)                                                             |
 | **Número total de transformaciones**                            | $\min(m, n)$: una reflexión por columna.                                                                                                    | Hasta $\frac{n(n-1)}{2}$ en el peor caso (aunque muchas operaciones pueden omitirse si los elementos ya son cero). | **Empate** (Householder usa menos transformaciones, Givens puede optimizarse en dispersos) |
 "
-
-# ╔═╡ 0cf3e3c2-6691-422f-a3f8-324f1d11f20f
-
 
 # ╔═╡ c7927f9f-a505-4099-b0e4-3bfedab1acb1
 md"Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas."
@@ -1671,14 +1792,29 @@ version = "1.4.1+2"
 # ╠═cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
 # ╠═d4367062-65de-49a7-9bd4-14851c9b9853
 # ╠═a7f97197-6a32-4d06-b35e-25de66c0aab5
+# ╠═d6da3e26-dfc2-480c-bbfb-2fac130af8a3
+# ╠═4a722520-c4be-42c8-8063-635008d82f67
+# ╠═dbc9cc32-bc9c-4554-a0ec-9bbf60f6e2ba
 # ╠═3df82014-b96d-4b01-bd1e-57d76831a118
-# ╠═b8ddcd70-e7d5-4de7-ac84-ed5a15820b0f
-# ╠═08bbb774-3a74-467b-904a-1b287310d174
+# ╠═7ee7684f-ff8d-4c2d-aa0d-a30d19e16fe8
+# ╠═e92436df-9ab2-4306-8088-947cb0087962
+# ╠═3c44536b-2922-4ee6-a52f-e1d1262bfe35
+# ╠═6fe6e55d-8916-4f78-a333-4112ff27a7fd
+# ╠═ce3873e4-a8b3-4a31-ace5-da41925c5a54
+# ╠═e03a43e2-78da-4e19-99f8-aa694bf33675
+# ╠═37ffd6f2-07f6-411f-b7c1-78dec8c19ff6
+# ╠═8dfc99fb-ab20-46f0-baef-464111c78ee0
+# ╠═a1866f28-21ee-40c5-9dc3-a73ef1a098e2
+# ╠═cd9e41cc-eca0-4db3-a675-80a20397149b
+# ╠═0fbb1d97-0823-4fac-8caa-550fb31084f7
+# ╠═ef6150de-78e2-4e6a-97c9-18bc23df7418
+# ╠═53ffc0bf-f8cb-4b18-b971-803390d99a06
+# ╠═20d9b30e-b85f-4087-a74f-d452a13c325f
+# ╠═65e755c0-3910-4427-b9d1-663e4539a893
 # ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
 # ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
-# ╟─2e5b592c-2e88-4552-9788-a31d7be04ad1
-# ╠═0cf3e3c2-6691-422f-a3f8-324f1d11f20f
+# ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
 # ╠═c7927f9f-a505-4099-b0e4-3bfedab1acb1
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
