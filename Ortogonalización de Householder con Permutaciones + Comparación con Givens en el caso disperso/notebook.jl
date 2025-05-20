@@ -120,12 +120,6 @@ md"
 
 "
 
-# ╔═╡ 88225a89-2323-4389-b878-a18ece3c97b1
-X1 \ y1 # Equivalente a y1/X1
-
-# ╔═╡ 9231da04-1d45-40b1-9cc6-ffe9fa9b62be
-qr(X1) \ y1
-
 # ╔═╡ b7dde798-274c-4484-b57a-d0b7f6f3be9d
 md"
 `qr_householder_pivoting(A)` solo devuelve Q, R, Z, pero no realiza la solución del sistema A x = b.
@@ -145,6 +139,15 @@ qr_householder_pivoting(X1)
 
 # ╔═╡ 0d1db270-2a92-4b88-8ca7-679026d56987
 solve_with_qr(X1, y1)
+
+# ╔═╡ af9f5df5-64aa-4406-a74a-4ebe59952bb4
+md"Vemos que la respuesta coincide con X\y y qr(X)\y"
+
+# ╔═╡ 88225a89-2323-4389-b878-a18ece3c97b1
+X1 \ y1 # Equivalente a y1/X1
+
+# ╔═╡ 9231da04-1d45-40b1-9cc6-ffe9fa9b62be
+qr(X1) \ y1
 
 # ╔═╡ 07d35c59-b314-4034-92ee-89d69fe286f8
 md" ### Evaluación del algoritmo"
@@ -179,7 +182,6 @@ end
 # ╔═╡ 72ecf964-878f-4aa0-9296-944a204e50d2
 md"
 #### En presencia de columnas casi dependientes:
-¿Columna casi dependiente?
 "
 
 # ╔═╡ a985046b-3b89-4b81-8626-615ff1efb852
@@ -200,6 +202,9 @@ begin
 	]) 
 end
 
+# ╔═╡ a52dc169-d858-484a-8ece-b6c03ba7933f
+md"El error no es significativamente diferente si las columnas son casi dependientes o no. Podemos hacer un mejor análisis si evaluamos un mayor número de posibilidades."
+
 # ╔═╡ 4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
 md"
 #### Variando la casi dependencia de las columnas: 
@@ -216,6 +221,28 @@ function getExampleMatrix(x)
 		7.0  14.0+x  9.0
 	] 
 end
+
+# ╔═╡ 0619059d-68dd-4e83-b725-551b5f8a4d0c
+function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0, diff::Float64 = 0.0)
+    @assert n ≥ 2 "La matriz debe tener al menos dos columnas"
+    
+    # Generar una columna aleatoria
+    col1 = randn(m)
+    
+    # Hacer la segunda columna una combinación lineal de la primera
+    col2 = ratio * col1
+	col2[1] += diff
+    
+    # Generar el resto de columnas (aleatorias)
+    other_cols = randn(m, n - 2)
+    
+    # Construir la matriz concatenando las columnas
+    A = hcat(col1, col2, other_cols)
+    return A
+end
+
+# ╔═╡ df51f2eb-b090-4084-9fc5-6454e0f0a5df
+gen_dependent_matrix(4,3,diff = 0.1)
 
 # ╔═╡ adba9ec6-5fd1-4e09-8974-20f758ae71d7
 begin
@@ -263,6 +290,29 @@ md" ### Comparación conceptual"
 # ╔═╡ f91d6a76-ec4b-49d5-9f0b-3e8511ab707f
 md" ### Comparación computacional"
 
+# ╔═╡ 110ac84e-e8c0-46e8-8bbb-c4944bcc5a31
+md"Primero, generamos una matriz dispersa de ejemplo"
+
+# ╔═╡ e6787d3b-63bf-4d03-8ed3-ec7b45ac9c1b
+A = sprand(1000, 1000, 0.01)  # 1000x1000, con 1% de entradas no nulas
+
+# ╔═╡ e9cf7ddc-994c-4771-971b-8f6200a2ec7c
+spy(A)  # Visualización de la estructura
+
+# ╔═╡ 7371c5eb-8f68-4c2f-b6db-5404ad7f6a6b
+begin
+	Fh = qr(A);
+	@btime qr(A);  # Julia decide internamente qué algoritmo usar
+	Qh = Matrix(Fh.Q)  # Convertimos a densa solo si queremos comparar reconstrucción
+	Rh = Matrix(Fh.R)
+end
+
+# ╔═╡ a2d6dfc9-13ab-4104-8750-5275dad2af61
+md"### Givens"
+
+# ╔═╡ 57a39ffe-c4f1-49f3-bd61-b5a04a168b7b
+
+
 # ╔═╡ a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 md"
 ### ¿Cuál de los dos métodos considera más adecuado para mantener la dispersión en una factorización QR de una matriz dispersa? 
@@ -283,14 +333,21 @@ La *transformación de Householder* implica una reflexión ortogonal $H = I - 2 
 La *rotación de Givens* implica una rotación ortogonal en el plano $(i, j)$ que anula un único elemento mediante una transformación local.
 "
 
+# ╔═╡ 977d0390-19a3-4bcf-ae75-8c6efdd38a85
+md"Givens, en caso de cero salta el paso re fácil
+Ambos pueden reemplazar ceros. Pero Givens modifica menos valores en cada paso, luego, puede reemplazar menos ceros.
+(Reemplazar Preservación con Alcance de cada transformación y Fill-in)
+"
+
 # ╔═╡ 2e5b592c-2e88-4552-9788-a31d7be04ad1
 md"
 
 | **Criterio**                                                    | **Transformaciones de Householder**                                                                                                         | **Rotaciones de Givens**                                                                                           | **Ganador (para matrices dispersas)**                                                      |
 | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
 | **Estructura de los operadores ortogonales**                    | Se requiere almacenar vectores reflejados ($v$), usualmente densos. Las matrices $H_k$ no son dispersas.                                    | Las rotaciones son representadas por ángulos $(c, s)$; no se almacenan matrices completas.                         | **Givens** (mejor almacenamiento)                                                          |
-| **Preservación de la estructura dispersa (Fill-in)**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en potencialmente toda la submatriz inferior derecha.                             | Buena: al modificar solo dos filas, el patrón de dispersión puede mantener en el resto de la matriz.                            | **Givens** (preserva mejor la dispersión)                                                  |
-| **Preservación de la estructura dispersa (Fill-in)**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en potencialmente toda la submatriz inferior derecha.                             | Buena: al modificar solo dos filas, el patrón de dispersión puede mantener en el resto de la matriz.                            | **Givens** (preserva mejor la dispersión)                                                  |
+| **Alcance de cada transformación**                              | Global: afecta toda la submatriz inferior derecha.                                                                                          | Local: modifica únicamente dos filas (i, j) de la matriz.                                                          | **Givens** (mejor preservación local)                                                      |
+| **Preservación de la estructura dispersa**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en muchas posiciones.                             | Buena: al modificar solo dos filas, el patrón de dispersión se mantiene en gran medida.                            | **Givens** (preserva mejor la dispersión)                                                  |
+| **Fill-in (llenado de ceros)**                                  | Alto: cada paso puede transformar columnas y filas escasamente pobladas en densas.                                                          | Bajo: el llenado se restringe al soporte conjunto de las filas involucradas.                                       | **Givens** (mínimo fill-in)                                                                |                                             |
 | **Costo computacional por transformación**                      | $\mathcal{O}(mn)$ por reflexión (en el caso general), pues afecta múltiples columnas y filas.                                               | $\mathcal{O}(n)$ por rotación (en promedio), afectando solo dos filas.                                             | **Givens** (mejor costo local)                                                             |
 | **Número total de transformaciones**                            | $\min(m, n)$: una reflexión por columna.                                                                                                    | Hasta $\frac{n(n-1)}{2}$ en el peor caso (aunque muchas operaciones pueden omitirse si los elementos ya son cero). | **Empate** (Householder usa menos transformaciones, Givens puede optimizarse en dispersos) |
 "
@@ -1458,12 +1515,13 @@ version = "1.4.1+2"
 # ╠═e92c4212-bbb5-436e-9280-d091671d5f0e
 # ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
 # ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
-# ╠═88225a89-2323-4389-b878-a18ece3c97b1
-# ╠═9231da04-1d45-40b1-9cc6-ffe9fa9b62be
 # ╟─b7dde798-274c-4484-b57a-d0b7f6f3be9d
 # ╠═a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
 # ╠═032e96e4-7ab9-4628-b553-197bee78c56b
 # ╠═0d1db270-2a92-4b88-8ca7-679026d56987
+# ╠═af9f5df5-64aa-4406-a74a-4ebe59952bb4
+# ╠═88225a89-2323-4389-b878-a18ece3c97b1
+# ╠═9231da04-1d45-40b1-9cc6-ffe9fa9b62be
 # ╠═07d35c59-b314-4034-92ee-89d69fe286f8
 # ╠═355cab0f-012f-4dff-9cb6-9f7135319487
 # ╠═9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
@@ -1472,16 +1530,26 @@ version = "1.4.1+2"
 # ╠═72ecf964-878f-4aa0-9296-944a204e50d2
 # ╠═a985046b-3b89-4b81-8626-615ff1efb852
 # ╠═cb654ecc-8917-4777-9f7e-c051f045d96b
+# ╠═a52dc169-d858-484a-8ece-b6c03ba7933f
 # ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
 # ╠═dea0031c-fff8-467c-81fc-16cd888bfa14
+# ╠═0619059d-68dd-4e83-b725-551b5f8a4d0c
+# ╠═df51f2eb-b090-4084-9fc5-6454e0f0a5df
 # ╠═adba9ec6-5fd1-4e09-8974-20f758ae71d7
 # ╠═b0b87d52-8fe9-4094-8aa4-b4f3f279049c
 # ╠═735b730a-f3a5-4f60-96df-39388326b05c
 # ╠═fd5d6a5b-2e6c-4737-8986-7ff8693e1389
 # ╠═f91d6a76-ec4b-49d5-9f0b-3e8511ab707f
+# ╠═110ac84e-e8c0-46e8-8bbb-c4944bcc5a31
+# ╠═e6787d3b-63bf-4d03-8ed3-ec7b45ac9c1b
+# ╠═e9cf7ddc-994c-4771-971b-8f6200a2ec7c
+# ╠═7371c5eb-8f68-4c2f-b6db-5404ad7f6a6b
+# ╠═a2d6dfc9-13ab-4104-8750-5275dad2af61
+# ╠═57a39ffe-c4f1-49f3-bd61-b5a04a168b7b
 # ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
-# ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
+# ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
+# ╟─2e5b592c-2e88-4552-9788-a31d7be04ad1
 # ╠═0cf3e3c2-6691-422f-a3f8-324f1d11f20f
 # ╠═c7927f9f-a505-4099-b0e4-3bfedab1acb1
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
