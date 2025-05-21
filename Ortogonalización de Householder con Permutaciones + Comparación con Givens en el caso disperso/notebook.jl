@@ -56,21 +56,15 @@ Responda:
 # ╔═╡ c6cbde37-2796-4867-b5f2-a918672749ad
 md""" ## Set up"""
 
-# ╔═╡ f1125307-1981-4cae-9e31-20cb3b6ad605
-
-
 # ╔═╡ dce5fe61-66f5-4e43-a460-4299b8ce21a9
 md"""
 ## Implementación de Householder QR con pivoteo
 Implemente en Julia el algoritmo de ortogonalización de Householder con permutaciones de columnas, es decir, el algoritmo de factorización QR con pivoteo columnar parcial:
 A=QRZ.
 🔍 Evalúe su algoritmo en presencia de columnas linealmente dependientes o casidependientes.
-"""
 
-# ╔═╡ d74fce97-4be3-4275-8818-4f18982a678e
-md"
 ### Código
-"
+"""
 
 # ╔═╡ ad100da0-c243-4335-9a59-947989b46da7
 function qr_householder_pivoting(A; tol=1e-12)
@@ -115,19 +109,18 @@ end
 # ╔═╡ 1f1fa94d-cd90-42bf-8480-88cc87e936ac
 md"
 ### Ejemplo
+
+`qr_householder_pivoting(A)` solo devuelve Q, R, Z, pero no realiza la solución del sistema A x = b.
+
+Para comparar su solución con X\y, utilizamos `solve_with_qr(A,b)`
 "
+
 
 # ╔═╡ 4e3fa428-1811-41d4-8e0c-4e47985536f7
 begin
 	y1 = randn(5)    # response vector
 	X1 = randn(5, 3) # predictor matrix
 end
-
-# ╔═╡ b7dde798-274c-4484-b57a-d0b7f6f3be9d
-md"
-`qr_householder_pivoting(A)` solo devuelve Q, R, Z, pero no realiza la solución del sistema A x = b.
-
-Para compararlo correctamente con X \ y, se añade la función solve_with_qr(A,b)"
 
 # ╔═╡ a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
 function solve_with_qr(A, b)
@@ -140,90 +133,22 @@ end
 # ╔═╡ 0d1db270-2a92-4b88-8ca7-679026d56987
 solve_with_qr(X1, y1)
 
-# ╔═╡ af9f5df5-64aa-4406-a74a-4ebe59952bb4
-md"Veamos que la respuesta de solve_with_qr coincide con X\y y qr(X)\y"
-
 # ╔═╡ 88225a89-2323-4389-b878-a18ece3c97b1
 X1 \ y1 # Equivalente a y1/X1
 
 # ╔═╡ 9231da04-1d45-40b1-9cc6-ffe9fa9b62be
 qr(X1) \ y1
 
-# ╔═╡ 07d35c59-b314-4034-92ee-89d69fe286f8
-md"
-### Evaluación del error del algoritmo
-En esta sección analizaremos si el error del algoritmo cambia si en la matriz hay columnas dependientes o casi dependientes.
+# ╔═╡ 6ffc7d62-400d-441f-9905-c79ebb2eb38d
+md"""
+### Evaluación del algoritmo en presencia de columnas linealmente dependientes o casidependientes
+Evaluemos los cambios en el algoritmo al modificar la casi dependencia de las columnas.
 
-Para evaluar el error utilizaremos `error_norm_qr_householder_pivoting`, la cual halla la diferencia entre la matriz original y la matriz reconstruida a partir de la descomposición QR generada por `qr_householder_pivoting`.
-"
+El pivoteo del algoritmo aprovecha la casi dependencia de columnas, al procesar las columnas casi dependientes primero y más rápido. Por lo cual, para evaluar la diferencia entre la presencia de columnas casi dependientes o no, es importante que no sean las primeras columnas las dependientes.
 
-# ╔═╡ 355cab0f-012f-4dff-9cb6-9f7135319487
-function error_norm_qr_householder_pivoting(A)
-    Q, R, Z = qr_householder_pivoting(A)
-    A_reconstructed = Q * R * Z'
-	return norm(A - A_reconstructed)
-end
-
-# ╔═╡ 9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
-function print_error_norm_qr_householder_pivoting(A)
-    println("Norma del error ||A - QRZᵗ|| = ", error_norm_qr_householder_pivoting(A))
-end
-
-# ╔═╡ 5ad2df44-15af-44e3-b915-0aff64a54310
-md"
-#### En presencia de columnas dependientes:
-"
-
-# ╔═╡ cbb04c19-ced2-4f83-9559-0a77437c1f70
-begin
-	print_error_norm_qr_householder_pivoting([
-		1.0  2.0  3.0;
-	    4.0  8.0  6.0;
-	    7.0  14.0  9.0
-	]) 
-end
-
-# ╔═╡ 72ecf964-878f-4aa0-9296-944a204e50d2
-md"
-#### En presencia de columnas casi dependientes:
-"
-
-# ╔═╡ a985046b-3b89-4b81-8626-615ff1efb852
-begin
-	print_error_norm_qr_householder_pivoting([
-		1.0  2.0  3.0;
-	    4.0  8.0  6.0;
-	    7.0  14.0001  9.0
-	]) 
-end
-
-# ╔═╡ cb654ecc-8917-4777-9f7e-c051f045d96b
-begin
-	print_error_norm_qr_householder_pivoting([
-		1.0  2.0  3.0;
-	    4.0  8.0  6.0;
-	    7.0  15.0  9.0
-	]) 
-end
-
-# ╔═╡ a52dc169-d858-484a-8ece-b6c03ba7933f
-md"El error no es significativamente diferente si las columnas son casi dependientes o no. Podemos hacer un mejor análisis si evaluamos un mayor número de posibilidades."
-
-# ╔═╡ 4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
-md"
-#### Variando la casi dependencia de las columnas: 
-Evaluemos los cambios en el error al modificar la casi dependencia de las columnas.
-"
-
-# ╔═╡ b323c5a5-46d7-4b7a-a019-58d8361dda1b
-md"
-Para esto, primero generamos matrices cuya primera y última columnas son dependientes con `gen_dependent_matrix`.
-Luego, con la función `mod_dependent_matrix` modificamos uno de sus valores para que modificar el primer valor de la primera columna, tal que las columnas mencionadas sean más o menos casi dependientes.
-Por último, graficamos el error de la reconstrucción QR con `error_norm_qr_householder_pivoting`
-"
-
-# ╔═╡ 80928dfb-12c8-4310-b7fd-6f922bbc16b1
-md"El pivoteo del algoritmo aprovecha la casi dependencia de columnas, al procesar las columnas casi dependientes primero y más rápido. Por lo cual, para evaluar la diferencia entre la presencia de columnas casi dependientes o no, es importante que no sean las primeras columnas las dependientes."
+Para la implementación de esto, primero generamos matrices cuya primera y última columnas son dependientes con `gen_dependent_matrix`.
+Luego, con la función `mod_dependent_matrix` modificamos el primer valor de la primera columna, tal que las columnas mencionadas sean tan "casi dependientes" como se quiera.
+"""
 
 # ╔═╡ 0619059d-68dd-4e83-b725-551b5f8a4d0c
 function gen_dependent_matrix(m::Int, n::Int; ratio::Float64 = 2.0)
@@ -249,6 +174,76 @@ function mod_dependent_matrix(A::Matrix, diff::Float64)
     return A
 end
 
+# ╔═╡ 9d8bda6d-69bd-485b-8c21-f012e42884d7
+function max_absolute_value_of(r::StepRangeLen)
+	return max(
+		abs(first(r)),
+		abs(last(r))
+	)
+end	
+
+# ╔═╡ 07d35c59-b314-4034-92ee-89d69fe286f8
+md"
+#### Evaluación del error del algoritmo
+En esta sección analizaremos si el error del algoritmo cambia si en la matriz hay columnas dependientes o casi dependientes.
+
+Para evaluar el error utilizaremos `error_norm_qr_householder_pivoting`, la cual halla la diferencia entre la matriz original y la matriz reconstruida a partir de la descomposición QR generada por `qr_householder_pivoting`.
+"
+
+# ╔═╡ 355cab0f-012f-4dff-9cb6-9f7135319487
+function error_norm_qr_householder_pivoting(A)
+    Q, R, Z = qr_householder_pivoting(A)
+    A_reconstructed = Q * R * Z'
+	return norm(A - A_reconstructed)
+end
+
+# ╔═╡ 9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
+function print_error_norm_qr_householder_pivoting(A)
+    println("Norma del error ||A - QRZᵗ|| = ", error_norm_qr_householder_pivoting(A))
+end
+
+# ╔═╡ 5ad2df44-15af-44e3-b915-0aff64a54310
+md"
+#### En presencia de columnas dependientes:
+"
+
+# ╔═╡ cbb04c19-ced2-4f83-9559-0a77437c1f70
+print_error_norm_qr_householder_pivoting([
+	1.0  2.0  3.0;
+	4.0  8.0  6.0;
+	7.0  14.0  9.0
+])
+
+# ╔═╡ 72ecf964-878f-4aa0-9296-944a204e50d2
+md"
+#### En presencia de columnas casi dependientes:
+"
+
+# ╔═╡ a985046b-3b89-4b81-8626-615ff1efb852
+print_error_norm_qr_householder_pivoting([
+	1.0  2.0  3.0;
+	4.0  8.0  6.0;
+	7.0  14.0001  9.0
+])
+
+# ╔═╡ cb654ecc-8917-4777-9f7e-c051f045d96b
+print_error_norm_qr_householder_pivoting([
+	1.0  2.0  3.0;
+	4.0  8.0  6.0;
+	7.0  15.0  9.0
+])
+
+# ╔═╡ a52dc169-d858-484a-8ece-b6c03ba7933f
+md"El error no es significativamente diferente si las columnas son casi dependientes o no. Podemos hacer un mejor análisis si evaluamos un mayor número de posibilidades."
+
+# ╔═╡ 4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
+md"
+#### Variando la casi dependencia de las columnas: 
+Evaluemos los cambios en el error al modificar la casi dependencia de las columnas.
+
+Para esto, graficamos el error de la reconstrucción QR con `error_norm_qr_householder_pivoting` para diferentes tres matrices con columnas casi dependientes.
+"
+
 # ╔═╡ df51f2eb-b090-4084-9fc5-6454e0f0a5df
 begin
 	AExample1 = gen_dependent_matrix(4,3)
@@ -256,9 +251,6 @@ begin
 	AExample3 = gen_dependent_matrix(4,3)
 	display(AExample1)
 end
-
-# ╔═╡ fd71fd5c-8702-4ecb-9bfb-c7d9a97e9b4e
-mod_dependent_matrix(AExample1,5.0)
 
 # ╔═╡ 3086fcf9-a97b-4b80-8dcf-ea069c7adccb
 function graph_householder_error_for_almost_dependent_matrices(range)
@@ -298,8 +290,16 @@ graph_householder_error_for_almost_dependent_matrices(range(-.00001, .00001, len
 
 # ╔═╡ e58f7432-b071-48c2-8683-76d7abbad4f1
 md"
+Observamos que:
+
+| Máxima diferencia | Máximo error (aprox) |
+|-----|----|
+|5.0  |$1.2*10^{-12}$|
+|0.5  |$1.2*10^{-12}$|
+|$1*10^{-3}$  |$6*10^{-14}$|
+|$1*10^{-5}$  |$8*10^{-15}$|
+
 Al comparar las gráficas de los diferentes rangos, podemos ver que el valor máximo disminuye a medida que disminuye el rango.
-El error máximo para diferencias de hasta .5 está alrededor de $9.0*10⁻14$, el de .001 y 0.00001 está en $8.0*10^{-15}$
 "
 
 # ╔═╡ dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
@@ -308,43 +308,45 @@ md"
 En esta sección analizaremos si el tiempo del algoritmo cambia si en la matriz hay columnas dependientes o casi dependientes.
 "
 
-# ╔═╡ f3ff1c1e-84b4-47d9-b186-d00178c6c6de
-time_qr_householder_pivoting_matrix_sizes = [5, 10]
+# ╔═╡ f0d694a0-12ca-4438-ac7c-6f10f6855b10
+function benchmark_householder_pivot_qr_for_almost_dependent(ns, A)
+    times = Float64[]
 
-# ╔═╡ 469c6587-8891-41c8-a62b-1bb835355e44
-function time_qr_householder_pivoting(A)
-	return @belapsed qr_householder_pivoting($A)
+    for n in ns
+        # Medición de tiempo
+        t  = @belapsed qr_householder_pivoting($mod_dependent_matrix($A,$n))
+        push!(times, t)
+    end
+	return times
+	
 end
 
-# ╔═╡ 933757b2-8b95-467b-87d0-8d4d4a2cbe8a
-time_qr_householder_pivoting(gen_dependent_matrix(4,3))
+# ╔═╡ ccf32bed-ed91-4867-82b7-ebde7fe22ccc
+md"Dado que las gráficas no tienden a tener cambios bruscos, no necesitamos graficar tantos valores. Por lo cual, vamos a generar las gráficas en un solo paso con ayuda de una función"
 
-# ╔═╡ dcb96a87-c14c-4f6d-be27-e4a54a20e198
-function graph_householder_time_for_almost_dependent_matrices(range)
-	title = "Error para diferencias de hasta " * string(last(range))
+# ╔═╡ 1f6fac45-2cd5-4123-bbbc-2a033a09ddd2
+function graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range, size, size_y=size)
+	
+	times = benchmark_householder_pivot_qr_for_almost_dependent(
+		range,
+		gen_dependent_matrix(size,size_y)
+	)
 	plot(
 		range, 
-		[time_qr_householder_pivoting(mod_dependent_matrix(AExample1,xi)) for xi in range], 
+		times, 
 		xlabel="Diferencia `x` entre columnas casi dependientes", 
-		ylabel="Error ||A - QRZᵗ||", 
-		title=title, 
+		ylabel="Tiempo (s)", 
+		title= "Tiempo para diferencias de hasta " * string(max_absolute_value_of(range)), 
 		legend=true,
 		label="AExample1"
 	)
-	plot!(
-		range, 
-		[time_qr_householder_pivoting(mod_dependent_matrix(AExample2,xi)) for xi in range],
-		label="AExample2"
-	)
-	plot!(
-		range, 
-		[time_qr_householder_pivoting(mod_dependent_matrix(AExample3,xi)) for xi in range],
-		label="AExample3"
-	)
 end
 
-# ╔═╡ 5b842aa4-c3d3-46e9-8049-2efe1583fec6
-#graph_householder_time_for_almost_dependent_matrices(range(-5, 5, length=500))
+# ╔═╡ fe359240-bcc5-4644-b4bc-306e2a70ffca
+graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-1, 1, length=50), 50)
+
+# ╔═╡ f81c8526-ee98-48cd-99f0-ffaad54aa289
+	graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-.1, .1, length=10), 50)
 
 # ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
 md"
@@ -430,7 +432,9 @@ La *rotación de Givens* implica una rotación ortogonal en el plano $(i, j)$ qu
 # ╔═╡ 3df82014-b96d-4b01-bd1e-57d76831a118
 md"
 ### Comparación computacional
-Vamos a realizar la comparación de ambos algoritmos para matrices densas y dispersas de diferentes tamaños
+Vamos a realizar la comparación de ambos algoritmos para matrices densas y dispersas de diferentes tamaños.
+#### De tiempo
+
 "
 
 # ╔═╡ e03a43e2-78da-4e19-99f8-aa694bf33675
@@ -460,10 +464,7 @@ end
 
 
 # ╔═╡ 8dfc99fb-ab20-46f0-baef-464111c78ee0
-md" #### Para matrices densas"
-
-# ╔═╡ a1866f28-21ee-40c5-9dc3-a73ef1a098e2
-
+md" ##### En matrices densas"
 
 # ╔═╡ bf43a9d8-62de-47e6-bf60-2111f9a01b03
 times_givens_dense, times_house_dense = benchmark_qr_methods(ns)
@@ -479,7 +480,7 @@ begin
 end
 
 # ╔═╡ 36b4511c-6531-46e4-bc66-a4cc75fbb87f
-md" #### Para matrices dispersas"
+md" ##### En matrices dispersas"
 
 # ╔═╡ 41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 times_givens_sparse, times_house_sparse = benchmark_qr_methods(ns, .1)
@@ -495,12 +496,21 @@ begin
 end
 
 # ╔═╡ 65e755c0-3910-4427-b9d1-663e4539a893
-md" #### Resultados
+md" ##### Resultados
 En el experimento, el algoritmo de Givens QR es más rápido que el de Householder QR con pivoteo. 
 Para las matrices densas, es apróximadamente el doble del tiempo. Sin embargo, para las matrices dispersas, la diferencia parece ser exponencial.
 "
 
-# ╔═╡ a7210a19-3d9d-494f-8fff-23a9e0fabfd9
+# ╔═╡ cbf02f31-d55e-46f4-85fb-800ec902e54c
+md"
+## De llenado de ceros
+
+"
+
+# ╔═╡ 1bf813e1-c297-437a-a6eb-780ba863dc15
+
+
+# ╔═╡ 9cce2e64-c3ee-461d-98f0-b7a3460046e8
 md"
 ### ¿Cuál de los dos métodos considera más adecuado para mantener la dispersión en una factorización QR de una matriz dispersa? 
 
@@ -509,10 +519,6 @@ Justifique su respuesta en términos de:
 * las operaciones necesarias y 
 * el patrón de llenado (fill-in).
 
-"
-
-# ╔═╡ 9cce2e64-c3ee-461d-98f0-b7a3460046e8
-md"
 Para **matrices dispersas**, las **rotaciones de Givens** son más adecuadas si el objetivo es **preservar la estructura dispersa** y **minimizar el llenado (fill-in)** durante la factorización QR.
 
 **Justificación:**
@@ -531,21 +537,17 @@ Para **matrices dispersas**, las **rotaciones de Givens** son más adecuadas si 
 md"Givens, en caso de cero salta el paso re fácil
 Ambos pueden reemplazar ceros. Pero Givens modifica menos valores en cada paso, luego, puede reemplazar menos ceros.
 (Reemplazar Preservación con Alcance de cada transformación y Fill-in)
-"
 
-# ╔═╡ c7927f9f-a505-4099-b0e4-3bfedab1acb1
-md"Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas."
-
-# ╔═╡ 78916b5c-2ccb-4d67-8323-885e299f64ab
-md"
- ## Reflexión
-Durante el desarrollo de esta tarea enfrenté diversas dificultades, principalmente relacionadas con el desconocimiento inicial de los algoritmos de factorización QR, en particular las transformaciones de Householder con pivoteo y las rotaciones de Givens. No obstante, el enfoque analítico requerido por el proyecto me permitió comprender su funcionamiento de forma progresiva, con el objetivo claro de poder compararlos tanto conceptual como computacionalmente.
-
-En relación con la tarea anterior, tuve menos dificultades en el manejo de Julia. Me sentí más cómodo experimentando, y los análisis que realicé estuvieron mejor fundamentados. Utilicé herramientas como @belapsed del paquete BenchmarkTools para medir tiempos de ejecución de forma precisa, y realicé visualizaciones con hasta 500 puntos de prueba para que mis conclusiones se basaran en tendencias observables y no en casos aislados.
+Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas.
 "
 
 # ╔═╡ ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 md"""
+ ## Reflexión
+Durante el desarrollo de esta tarea enfrenté diversas dificultades, principalmente relacionadas con el desconocimiento inicial de los algoritmos de factorización QR, en particular las transformaciones de Householder con pivoteo y las rotaciones de Givens. No obstante, el enfoque analítico requerido por el proyecto me permitió comprender su funcionamiento de forma progresiva, con el objetivo claro de poder compararlos tanto conceptual como computacionalmente.
+
+En relación con la tarea anterior, tuve menos dificultades en el manejo de Julia. Me sentí más cómodo experimentando, y los análisis que realicé estuvieron mejor fundamentados. Utilicé herramientas como @belapsed del paquete BenchmarkTools para medir tiempos de ejecución de forma precisa, y realicé visualizaciones con hasta 500 puntos de prueba para que mis conclusiones se basaran en tendencias observables y no en casos aislados.
+
 ## 🤖 Declaración de IA y fuentes externas
 
 Se utilizó inteligencia artificial —en particular **ChatGPT de OpenAI**— como herramienta de apoyo para:
@@ -584,44 +586,6 @@ md"
 - [ ] spy fill-in
 - [ ] Rewrite
 "
-
-# ╔═╡ f0d694a0-12ca-4438-ac7c-6f10f6855b10
-function benchmark_qr_methods_sparse(ns, density=.1)
-    times_givens = Float64[]
-    times_house = Float64[]
-
-    for n in ns
-        A = sprand(n, n, density)
-
-        # Medición de tiempo
-        t_matrix1  = @belapsed qr_householder_pivoting($A)
-
-        push!(times_givens, t_givens)
-        push!(times_house, t_house)
-    end
-
-    return times_givens, times_house
-end
-
-# ╔═╡ ef6150de-78e2-4e6a-97c9-18bc23df7418
-function benchmark_qr_methods_sparse(ns, density=.1)
-    times_givens = Float64[]
-    times_house = Float64[]
-
-    for n in ns
-        A = sprand(n, n, density)
-
-        # Medición de tiempo
-        t_givens = @belapsed givens_qr($A)
-        t_house  = @belapsed qr_householder_pivoting($A)
-
-        push!(times_givens, t_givens)
-        push!(times_house, t_house)
-    end
-
-    return times_givens, times_house
-end
-
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1756,49 +1720,43 @@ version = "1.4.1+2"
 # ╟─0d4e1dfc-3232-11f0-1549-17244c3a3ae6
 # ╠═c6cbde37-2796-4867-b5f2-a918672749ad
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
-# ╠═f1125307-1981-4cae-9e31-20cb3b6ad605
-# ╠═dce5fe61-66f5-4e43-a460-4299b8ce21a9
-# ╠═d74fce97-4be3-4275-8818-4f18982a678e
+# ╟─dce5fe61-66f5-4e43-a460-4299b8ce21a9
 # ╠═ad100da0-c243-4335-9a59-947989b46da7
 # ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
 # ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
-# ╟─b7dde798-274c-4484-b57a-d0b7f6f3be9d
 # ╠═a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
 # ╠═0d1db270-2a92-4b88-8ca7-679026d56987
-# ╠═af9f5df5-64aa-4406-a74a-4ebe59952bb4
 # ╠═88225a89-2323-4389-b878-a18ece3c97b1
 # ╠═9231da04-1d45-40b1-9cc6-ffe9fa9b62be
-# ╠═07d35c59-b314-4034-92ee-89d69fe286f8
-# ╠═355cab0f-012f-4dff-9cb6-9f7135319487
-# ╠═9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
-# ╠═5ad2df44-15af-44e3-b915-0aff64a54310
-# ╠═cbb04c19-ced2-4f83-9559-0a77437c1f70
-# ╠═72ecf964-878f-4aa0-9296-944a204e50d2
-# ╠═a985046b-3b89-4b81-8626-615ff1efb852
-# ╠═cb654ecc-8917-4777-9f7e-c051f045d96b
-# ╠═a52dc169-d858-484a-8ece-b6c03ba7933f
-# ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
-# ╠═b323c5a5-46d7-4b7a-a019-58d8361dda1b
-# ╠═80928dfb-12c8-4310-b7fd-6f922bbc16b1
+# ╠═6ffc7d62-400d-441f-9905-c79ebb2eb38d
 # ╠═0619059d-68dd-4e83-b725-551b5f8a4d0c
 # ╠═33904f82-3141-4263-b5d6-1c9f71c91c13
+# ╠═9d8bda6d-69bd-485b-8c21-f012e42884d7
+# ╟─07d35c59-b314-4034-92ee-89d69fe286f8
+# ╠═355cab0f-012f-4dff-9cb6-9f7135319487
+# ╠═9ce7b2f3-3d53-49b6-a815-6491e0c8c2f0
+# ╟─5ad2df44-15af-44e3-b915-0aff64a54310
+# ╠═cbb04c19-ced2-4f83-9559-0a77437c1f70
+# ╟─72ecf964-878f-4aa0-9296-944a204e50d2
+# ╠═a985046b-3b89-4b81-8626-615ff1efb852
+# ╠═cb654ecc-8917-4777-9f7e-c051f045d96b
+# ╟─a52dc169-d858-484a-8ece-b6c03ba7933f
+# ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
 # ╠═df51f2eb-b090-4084-9fc5-6454e0f0a5df
-# ╠═fd71fd5c-8702-4ecb-9bfb-c7d9a97e9b4e
 # ╠═3086fcf9-a97b-4b80-8dcf-ea069c7adccb
 # ╠═a0ac0068-0638-4a71-af95-8f78b2c14e32
 # ╠═f9f4bf3f-c73f-4eac-b430-8cad5e072b94
 # ╠═a8c14878-ee23-45f4-a775-f9dd30545d3f
 # ╠═8898e3d0-3bf4-42c7-bb38-cbec5c2a0692
-# ╠═e58f7432-b071-48c2-8683-76d7abbad4f1
-# ╠═dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
-# ╠═f3ff1c1e-84b4-47d9-b186-d00178c6c6de
-# ╠═933757b2-8b95-467b-87d0-8d4d4a2cbe8a
+# ╟─e58f7432-b071-48c2-8683-76d7abbad4f1
+# ╟─dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
 # ╠═f0d694a0-12ca-4438-ac7c-6f10f6855b10
-# ╠═469c6587-8891-41c8-a62b-1bb835355e44
-# ╠═dcb96a87-c14c-4f6d-be27-e4a54a20e198
-# ╠═5b842aa4-c3d3-46e9-8049-2efe1583fec6
-# ╠═735b730a-f3a5-4f60-96df-39388326b05c
-# ╠═cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
+# ╟─ccf32bed-ed91-4867-82b7-ebde7fe22ccc
+# ╠═1f6fac45-2cd5-4123-bbbc-2a033a09ddd2
+# ╠═fe359240-bcc5-4644-b4bc-306e2a70ffca
+# ╠═f81c8526-ee98-48cd-99f0-ffaad54aa289
+# ╟─735b730a-f3a5-4f60-96df-39388326b05c
+# ╟─cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
 # ╠═d4367062-65de-49a7-9bd4-14851c9b9853
 # ╠═a7f97197-6a32-4d06-b35e-25de66c0aab5
 # ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
@@ -1806,19 +1764,16 @@ version = "1.4.1+2"
 # ╠═e03a43e2-78da-4e19-99f8-aa694bf33675
 # ╠═37ffd6f2-07f6-411f-b7c1-78dec8c19ff6
 # ╠═8dfc99fb-ab20-46f0-baef-464111c78ee0
-# ╠═a1866f28-21ee-40c5-9dc3-a73ef1a098e2
 # ╠═bf43a9d8-62de-47e6-bf60-2111f9a01b03
 # ╠═cd9e41cc-eca0-4db3-a675-80a20397149b
 # ╠═36b4511c-6531-46e4-bc66-a4cc75fbb87f
-# ╠═ef6150de-78e2-4e6a-97c9-18bc23df7418
 # ╠═41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 # ╠═20d9b30e-b85f-4087-a74f-d452a13c325f
 # ╠═65e755c0-3910-4427-b9d1-663e4539a893
-# ╠═a7210a19-3d9d-494f-8fff-23a9e0fabfd9
+# ╠═cbf02f31-d55e-46f4-85fb-800ec902e54c
+# ╠═1bf813e1-c297-437a-a6eb-780ba863dc15
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
 # ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
-# ╠═c7927f9f-a505-4099-b0e4-3bfedab1acb1
-# ╠═78916b5c-2ccb-4d67-8323-885e299f64ab
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 # ╟─00000000-0000-0000-0000-000000000001
