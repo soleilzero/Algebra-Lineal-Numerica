@@ -56,6 +56,9 @@ Responda:
 # ╔═╡ c6cbde37-2796-4867-b5f2-a918672749ad
 md""" ## Set up"""
 
+# ╔═╡ f1125307-1981-4cae-9e31-20cb3b6ad605
+
+
 # ╔═╡ dce5fe61-66f5-4e43-a460-4299b8ce21a9
 md"""
 ## Implementación de Householder QR con pivoteo
@@ -341,7 +344,7 @@ function graph_householder_time_for_almost_dependent_matrices(range)
 end
 
 # ╔═╡ 5b842aa4-c3d3-46e9-8049-2efe1583fec6
-graph_householder_time_for_almost_dependent_matrices(range(-5, 5, length=500))
+#graph_householder_time_for_almost_dependent_matrices(range(-5, 5, length=500))
 
 # ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
 md"
@@ -533,24 +536,72 @@ Ambos pueden reemplazar ceros. Pero Givens modifica menos valores en cada paso, 
 # ╔═╡ c7927f9f-a505-4099-b0e4-3bfedab1acb1
 md"Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas."
 
-# ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
+# ╔═╡ 78916b5c-2ccb-4d67-8323-885e299f64ab
 md"
-## TO DO
-- [ ] time householder: change matrix size
-- [ ] spy
-- [ ] Rewrite
-- [ ] ChatGPT annex
+ ## Reflexión
+Durante el desarrollo de esta tarea enfrenté diversas dificultades, principalmente relacionadas con el desconocimiento inicial de los algoritmos de factorización QR, en particular las transformaciones de Householder con pivoteo y las rotaciones de Givens. No obstante, el enfoque analítico requerido por el proyecto me permitió comprender su funcionamiento de forma progresiva, con el objetivo claro de poder compararlos tanto conceptual como computacionalmente.
+
+En relación con la tarea anterior, tuve menos dificultades en el manejo de Julia. Me sentí más cómodo experimentando, y los análisis que realicé estuvieron mejor fundamentados. Utilicé herramientas como @belapsed del paquete BenchmarkTools para medir tiempos de ejecución de forma precisa, y realicé visualizaciones con hasta 500 puntos de prueba para que mis conclusiones se basaran en tendencias observables y no en casos aislados.
 "
 
 # ╔═╡ ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
+md"""
+## 🤖 Declaración de IA y fuentes externas
+
+Se utilizó inteligencia artificial —en particular **ChatGPT de OpenAI**— como herramienta de apoyo para:
+
+* entender los algoritmos utilizados,
+* generar código en Julia conforme a algoritmos académicos,
+* organizar comparaciones conceptuales y computacionales,
+* corregir problemas de implementación de código en Julia,
+* y redactar secciones del informe bajo supervisión y revisión crítica del estudiante.
+
+Los principales *prompts* utilizados fueron:
+
+* "¿Por qué es diferente el resultado de `X \\ y` del que se obtiene con `qr_householder_pivoting()`?"
+* "Por favor, guíame en cómo hacer esto: comparar computacionalmente Householder y Givens para matrices dispersas, usando `sprand()` y `spy()`."
+* "Por favor, escribe este algoritmo de Givens en Julia: Algorithm 5.2.4 (Givens QR) dado A ∈ ℝ^{m×n}..."
+* Cuando ejecuto el código, la función givens_qr() genera el siguiente error: InexactError: Bool(-0.9346593678274439)
+* "¿Cómo podría hacer la comparación práctica entre los dos métodos?"
+* "Me gustaría graficar los `compare_qr` para matrices de diferente tamaño."
+* "Por favor, escribe dos secciones: la contribución del autor y reflexión, y la declaración de IA y fuentes externas."
+
+La IA fue utilizada de manera responsable como herramienta de apoyo técnico y pedagógico.
+
+### 📚 Recursos usados
+
+* **ChatGPT**
+* [*Householder Method for QR decomposition* playlist by Adam Sperry](https://www.youtube.com/playlist?list=PLxKgD50sMRvBHxvNPnGQ1kEHlO5y7mSnh)
+* [*Computational tools for research in (bio)statistics* by Dr. Hua Zhou](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting)
+* [*Householder reflections versus Givens rotations in sparse orthogonal decomposition*](https://www.sciencedirect.com/science/article/pii/002437958790111X)
+* *Matrix Computations*, Golub & Van Loan
+"""
+
+# ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 md"
-### Recursos usados
-- ChatGPT
-- [Householder Method for QR decomposition playlist by Adam Sperry] (https://www.youtube.com/playlist?list=PLxKgD50sMRvBHxvNPnGQ1kEHlO5y7mSnh)
-- [Computational tools for research in (bio)statistics, including numerical linear algebra and optimization by Dr. Hua Zhou](https://hua-zhou.github.io/teaching/biostatm280-2019spring/slides/11-qr/qr.html#Householder-QR-with-column-pivoting)
-- [Householder reflections versus givens rotations in sparse orthogonal decomposition](https://www.sciencedirect.com/science/article/pii/002437958790111X)
-- Matrix Computations (Golub & Van Loan)
+## TO DO
+- [ ] time householder
+- [ ] spy fill-in
+- [ ] Rewrite
 "
+
+# ╔═╡ f0d694a0-12ca-4438-ac7c-6f10f6855b10
+function benchmark_qr_methods_sparse(ns, density=.1)
+    times_givens = Float64[]
+    times_house = Float64[]
+
+    for n in ns
+        A = sprand(n, n, density)
+
+        # Medición de tiempo
+        t_matrix1  = @belapsed qr_householder_pivoting($A)
+
+        push!(times_givens, t_givens)
+        push!(times_house, t_house)
+    end
+
+    return times_givens, times_house
+end
 
 # ╔═╡ ef6150de-78e2-4e6a-97c9-18bc23df7418
 function benchmark_qr_methods_sparse(ns, density=.1)
@@ -571,24 +622,6 @@ function benchmark_qr_methods_sparse(ns, density=.1)
     return times_givens, times_house
 end
 
-
-# ╔═╡ f0d694a0-12ca-4438-ac7c-6f10f6855b10
-function benchmark_qr_methods_sparse(ns, density=.1)
-    times_givens = Float64[]
-    times_house = Float64[]
-
-    for n in ns
-        A = sprand(n, n, density)
-
-        # Medición de tiempo
-        t_matrix1  = @belapsed qr_householder_pivoting($A)
-
-        push!(times_givens, t_givens)
-        push!(times_house, t_house)
-    end
-
-    return times_givens, times_house
-end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1723,6 +1756,7 @@ version = "1.4.1+2"
 # ╟─0d4e1dfc-3232-11f0-1549-17244c3a3ae6
 # ╠═c6cbde37-2796-4867-b5f2-a918672749ad
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
+# ╠═f1125307-1981-4cae-9e31-20cb3b6ad605
 # ╠═dce5fe61-66f5-4e43-a460-4299b8ce21a9
 # ╠═d74fce97-4be3-4275-8818-4f18982a678e
 # ╠═ad100da0-c243-4335-9a59-947989b46da7
@@ -1784,7 +1818,8 @@ version = "1.4.1+2"
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
 # ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
 # ╠═c7927f9f-a505-4099-b0e4-3bfedab1acb1
-# ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
+# ╠═78916b5c-2ccb-4d67-8323-885e299f64ab
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
+# ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
