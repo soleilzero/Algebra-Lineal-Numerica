@@ -66,6 +66,119 @@ A=QRZ.
 ### Código
 """
 
+# ╔═╡ c269a7b8-93fc-4cdb-bfb9-9ab3ed3e1c1c
+"""
+    house(x) -> v, β
+
+Algoritmo 5.1.1: Dado un vector `x`, devuelve el vector de Householder `v` (con v[1] = 1)
+y el escalar `β` tal que `P = I - β * v * v'` es ortogonal y `P * x = ±‖x‖ e₁`.
+"""
+function house(x)
+    m = length(x)
+    σ = dot(x[2:end], x[2:end])
+    v = [1.0; x[2:end]]
+
+    if σ == 0.0
+        if x[1] ≥ 0.0
+            β = 0.0
+        else
+            β = -2.0
+        end
+    else
+        μ = sqrt(x[1]^2 + σ)
+        if x[1] ≤ 0
+            v[1] = x[1] - μ
+        else
+            v[1] = -σ / (x[1] + μ)
+        end
+        β = 2 * v[1]^2 / (σ + v[1]^2)
+        v /= v[1]
+    end
+
+    return v, β
+end
+
+
+# ╔═╡ e9d5027a-719a-460c-8529-7e2a5fbd73d3
+"""
+    qr_householder_pivoting(A) -> A_out, piv, r
+
+Algoritmo 5.4.1: QR con pivoteo por columnas. Sobrescribe la matriz `A`:
+- Parte superior triangular contiene `R`,
+- Debajo de la diagonal: vectores de Householder compactados.
+- `piv` codifica la permutación de columnas (Π).
+- `r` es el rango estimado.
+"""
+function qr_householder_with_pivot(A)
+    A = copy(A)
+    m, n = size(A)
+    c = [dot(A[:, j], A[:, j]) for j in 1:n]  # c(j) = ||A[:,j]||²
+    piv = collect(1:n)
+    r = 0
+    τ = maximum(c)
+
+    while τ > 0 && r < n
+        r += 1
+        # Encontrar el índice k con c(k) = τ, mínimo k
+        k = findfirst(c[r:n] .== τ) + r - 1
+
+        # Intercambiar columnas r y k en A, c, y piv
+        A[:, [r, k]] = A[:, [k, r]]
+        c[[r, k]] = c[[k, r]]
+		piv[[r, k]] = piv[[k, r]]
+
+
+        # Calcular Householder: A[r:end, r]
+        v, β = house(A[r:end, r])
+
+        # Aplicar la reflexión: A[r:end, r:n] -= β * v * (v' * A[r:end, r:n])
+        A[r:end, r:n] .-= β * v * (v' * A[r:end, r:n])
+
+        # Guardar vector v en A
+        A[r+1:end, r] = v[2:end]
+
+        # Actualizar normas c(i)
+        for i in r+1:n
+            c[i] -= A[r, i]^2
+        end
+
+        τ = maximum(c[r+1:end]; init=0.0)
+    end
+
+    return A, piv, r
+end
+
+
+# ╔═╡ fdd67542-eb97-4159-ac52-55235541cd89
+begin
+	B = sprand(100,100, 0.01)
+	qr_householder_with_pivot(B)
+end
+
+# ╔═╡ 44c341fa-b702-48b7-afe4-5e329b3a8317
+function reconstruct_Q(A_fact, r)
+    m = size(A_fact, 1)
+    Q = Matrix{Float64}(I, m, m)
+
+    for j in r:-1:1
+        v = [1.0; A_fact[j+1:end, j]]
+        β = 2.0 / dot(v, v)
+        Q[j:end, :] .-= β * v * (v' * Q[j:end, :])
+    end
+
+    return Q
+end
+
+# ╔═╡ 7aef6c03-114b-48b6-9fe7-3f52375b37ab
+function qr_householder_with_pivot_results(A)
+	A_fact, piv, rank_est = qr_householder_with_pivot(A)
+	Q = reconstruct_Q(A_fact, rank_est)
+	R = triu(A_fact)
+	n = size(A, 2)
+	Z = I(n)[:, piv]' 
+	return Q, R, Z
+end
+
 # ╔═╡ ad100da0-c243-4335-9a59-947989b46da7
 function qr_householder_pivoting(A; tol=1e-12)
     m, n = size(A)
@@ -109,10 +222,6 @@ end
 # ╔═╡ 1f1fa94d-cd90-42bf-8480-88cc87e936ac
 md"
 ### Ejemplo
-
-`qr_householder_pivoting(A)` solo devuelve Q, R, Z, pero no realiza la solución del sistema A x = b.
-
-Para comparar su solución con X\y, utilizamos `solve_with_qr(A,b)`
 "
 
 
@@ -120,24 +229,25 @@ Para comparar su solución con X\y, utilizamos `solve_with_qr(A,b)`
 begin
 	y1 = randn(5)    # response vector
 	X1 = randn(5, 3) # predictor matrix
+	display(X1)
 end
 
 # ╔═╡ a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
 function solve_with_qr(A, b)
-    Q, R, Z = qr_householder_pivoting(A)
+    Q, R, Z = qr_householder_with_pivot_results(A)
     Qtb = Q' * b
     x_hat = R \ Qtb     # Solución en coordenadas permutadas
     return Z * x_hat    # Deshacer la permutación de columnas
 end
 
-# ╔═╡ 0d1db270-2a92-4b88-8ca7-679026d56987
-solve_with_qr(X1, y1)
+# ╔═╡ 4e529288-d039-49ca-b298-295d60b6e99e
+Q1,R1,Z1 = qr_householder_with_pivot_results(X1)
 
-# ╔═╡ 88225a89-2323-4389-b878-a18ece3c97b1
-X1 \ y1 # Equivalente a y1/X1
+# ╔═╡ c92f4eab-1462-49ff-8ef5-a5a5db663209
+reconstructed = Q1 * R1 * Z1
 
-# ╔═╡ 9231da04-1d45-40b1-9cc6-ffe9fa9b62be
-qr(X1) \ y1
+# ╔═╡ 9bb2ebde-f43d-4111-b1f0-706e4be8c50f
+norm(reconstructed - X1)
 
 # ╔═╡ 6ffc7d62-400d-441f-9905-c79ebb2eb38d
 md"""
@@ -192,7 +302,7 @@ Para evaluar el error utilizaremos `error_norm_qr_householder_pivoting`, la cual
 
 # ╔═╡ 355cab0f-012f-4dff-9cb6-9f7135319487
 function error_norm_qr_householder_pivoting(A)
-    Q, R, Z = qr_householder_pivoting(A)
+    Q, R, Z = qr_householder_with_pivot_results(A)
     A_reconstructed = Q * R * Z'
 	return norm(A - A_reconstructed)
 end
@@ -290,6 +400,7 @@ graph_householder_error_for_almost_dependent_matrices(range(-.00001, .00001, len
 
 # ╔═╡ e58f7432-b071-48c2-8683-76d7abbad4f1
 md"
+#### Resultados
 Observamos que:
 
 | Máxima diferencia | Máximo error (aprox) |
@@ -314,7 +425,7 @@ function benchmark_householder_pivot_qr_for_almost_dependent(ns, A)
 
     for n in ns
         # Medición de tiempo
-        t  = @belapsed qr_householder_pivoting($mod_dependent_matrix($A,$n))
+        t  = @belapsed qr_householder_with_pivot($mod_dependent_matrix($A,$n))
         push!(times, t)
     end
 	return times
@@ -346,7 +457,12 @@ end
 graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-1, 1, length=50), 50)
 
 # ╔═╡ f81c8526-ee98-48cd-99f0-ffaad54aa289
-	graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-.1, .1, length=10), 50)
+graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-.1, .1, length=10), 50)
+
+# ╔═╡ 6aabdc0e-c854-48f1-af38-98d2376bfaea
+md"""
+#### Resultados
+"""
 
 # ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
 md"
@@ -453,7 +569,7 @@ function benchmark_qr_methods(ns, density=nothing)
 		end
         # Medición de tiempo
         t_givens = @belapsed givens_qr($A)
-        t_house  = @belapsed qr_householder_pivoting($A)
+        t_house  = @belapsed qr_householder_with_pivot($A)
 
         push!(times_givens, t_givens)
         push!(times_house, t_house)
@@ -495,20 +611,41 @@ begin
 	
 end
 
+# ╔═╡ 13be06d6-7213-43e9-96c6-ebadc25b13f8
+
+
 # ╔═╡ 65e755c0-3910-4427-b9d1-663e4539a893
 md" ##### Resultados
-En el experimento, el algoritmo de Givens QR es más rápido que el de Householder QR con pivoteo. 
-Para las matrices densas, es apróximadamente el doble del tiempo. Sin embargo, para las matrices dispersas, la diferencia parece ser exponencial.
+En ambos experimento, el algoritmo de Givens QR es más rápido que el de Householder QR con pivoteo.
+
+Sin embargo, para las matrices densas, la diferencia es ligera. Mientras que, para las matrices dispersas, la diferencia es importante.
 "
 
 # ╔═╡ cbf02f31-d55e-46f4-85fb-800ec902e54c
 md"
 ## De llenado de ceros
-
 "
 
-# ╔═╡ 1bf813e1-c297-437a-a6eb-780ba863dc15
+# ╔═╡ 8001cf5a-123d-411d-bee5-d218745823dc
+A = sprand(100,100, 0.01)
 
+# ╔═╡ 0bd64eb8-8083-4aaf-b36d-8b71de1dbf74
+A_fact, piv, rank_est = qr_householder_with_pivot(A)
+
+# ╔═╡ 4f226f6a-543c-4876-9ead-fafa86decc29
+R_householder = triu(A_fact[1:end, 1:end])
+
+# ╔═╡ aa5998fd-184b-4a89-84f2-90ca8765f80e
+Q_givens, R_givens = givens_qr(A)
+
+# ╔═╡ 2a00132b-4d2d-45e6-b2fb-3ab46f09f41c
+spy(A, title="Matriz original")
+
+# ╔═╡ fe1a52e8-c9bb-485e-86eb-fd0728eee79b
+spy(R_householder,title="Matriz R con Householder QR con pivoteo")
+
+# ╔═╡ c4e572dd-5873-4cd7-aa4b-80f622c2aeb7
+spy(R_givens,title="Matriz R con Givens QR")
 
 # ╔═╡ 9cce2e64-c3ee-461d-98f0-b7a3460046e8
 md"
@@ -1721,13 +1858,18 @@ version = "1.4.1+2"
 # ╠═c6cbde37-2796-4867-b5f2-a918672749ad
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
 # ╟─dce5fe61-66f5-4e43-a460-4299b8ce21a9
+# ╠═c269a7b8-93fc-4cdb-bfb9-9ab3ed3e1c1c
+# ╠═e9d5027a-719a-460c-8529-7e2a5fbd73d3
+# ╠═fdd67542-eb97-4159-ac52-55235541cd89
+# ╠═44c341fa-b702-48b7-afe4-5e329b3a8317
+# ╠═7aef6c03-114b-48b6-9fe7-3f52375b37ab
 # ╠═ad100da0-c243-4335-9a59-947989b46da7
 # ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
 # ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
 # ╠═a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
-# ╠═0d1db270-2a92-4b88-8ca7-679026d56987
-# ╠═88225a89-2323-4389-b878-a18ece3c97b1
-# ╠═9231da04-1d45-40b1-9cc6-ffe9fa9b62be
+# ╠═4e529288-d039-49ca-b298-295d60b6e99e
+# ╠═c92f4eab-1462-49ff-8ef5-a5a5db663209
+# ╠═9bb2ebde-f43d-4111-b1f0-706e4be8c50f
 # ╠═6ffc7d62-400d-441f-9905-c79ebb2eb38d
 # ╠═0619059d-68dd-4e83-b725-551b5f8a4d0c
 # ╠═33904f82-3141-4263-b5d6-1c9f71c91c13
@@ -1755,6 +1897,7 @@ version = "1.4.1+2"
 # ╠═1f6fac45-2cd5-4123-bbbc-2a033a09ddd2
 # ╠═fe359240-bcc5-4644-b4bc-306e2a70ffca
 # ╠═f81c8526-ee98-48cd-99f0-ffaad54aa289
+# ╠═6aabdc0e-c854-48f1-af38-98d2376bfaea
 # ╟─735b730a-f3a5-4f60-96df-39388326b05c
 # ╟─cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
 # ╠═d4367062-65de-49a7-9bd4-14851c9b9853
@@ -1769,9 +1912,16 @@ version = "1.4.1+2"
 # ╠═36b4511c-6531-46e4-bc66-a4cc75fbb87f
 # ╠═41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 # ╠═20d9b30e-b85f-4087-a74f-d452a13c325f
+# ╠═13be06d6-7213-43e9-96c6-ebadc25b13f8
 # ╠═65e755c0-3910-4427-b9d1-663e4539a893
 # ╠═cbf02f31-d55e-46f4-85fb-800ec902e54c
-# ╠═1bf813e1-c297-437a-a6eb-780ba863dc15
+# ╠═8001cf5a-123d-411d-bee5-d218745823dc
+# ╠═0bd64eb8-8083-4aaf-b36d-8b71de1dbf74
+# ╠═4f226f6a-543c-4876-9ead-fafa86decc29
+# ╠═aa5998fd-184b-4a89-84f2-90ca8765f80e
+# ╠═2a00132b-4d2d-45e6-b2fb-3ab46f09f41c
+# ╠═fe1a52e8-c9bb-485e-86eb-fd0728eee79b
+# ╠═c4e572dd-5873-4cd7-aa4b-80f622c2aeb7
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
 # ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
