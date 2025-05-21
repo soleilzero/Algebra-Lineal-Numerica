@@ -10,6 +10,7 @@ begin
 	using SparseArrays
 	using BenchmarkTools
 	using Plots
+	using PrettyTables
 end
 
 # ╔═╡ 4f16bf43-ed9a-4e2b-8e41-600b8a4b0ea4
@@ -611,9 +612,6 @@ begin
 	
 end
 
-# ╔═╡ 13be06d6-7213-43e9-96c6-ebadc25b13f8
-
-
 # ╔═╡ 65e755c0-3910-4427-b9d1-663e4539a893
 md" ##### Resultados
 En ambos experimento, el algoritmo de Givens QR es más rápido que el de Householder QR con pivoteo.
@@ -624,19 +622,34 @@ Sin embargo, para las matrices densas, la diferencia es ligera. Mientras que, pa
 # ╔═╡ cbf02f31-d55e-46f4-85fb-800ec902e54c
 md"
 ## De llenado de ceros
+Evaluemos la conservación de la matriz dispersa de ambos métodos.
+"
+
+# ╔═╡ 0e88256e-3dd1-46fe-a64c-ba5d2cbe200b
+function density(A) 
+	num_nonzeros = isa(A, SparseArrays.AbstractSparseMatrix) ? nnz(A) : count(!iszero, A) 
+	return num_nonzeros / length(A)
+end
+
+# ╔═╡ e743312f-1c13-4e3c-ba1c-e71d0b9109b1
+md"
+### Ejemplo
 "
 
 # ╔═╡ 8001cf5a-123d-411d-bee5-d218745823dc
-A = sprand(100,100, 0.01)
+begin
+	A = sprand(150, 150, 0.01)
+	A_fact, piv, rank_est = qr_householder_with_pivot(A)
+	Q_householder, R_householder, Z_householder = qr_householder_with_pivot_results(A)
+	Q_givens, R_givens = givens_qr(A)
+end
 
-# ╔═╡ 0bd64eb8-8083-4aaf-b36d-8b71de1dbf74
-A_fact, piv, rank_est = qr_householder_with_pivot(A)
-
-# ╔═╡ 4f226f6a-543c-4876-9ead-fafa86decc29
-R_householder = triu(A_fact[1:end, 1:end])
-
-# ╔═╡ aa5998fd-184b-4a89-84f2-90ca8765f80e
-Q_givens, R_givens = givens_qr(A)
+# ╔═╡ 028e9a85-8a6b-41af-970b-72d337375083
+begin
+	display(density(A))
+	display(density(R_householder))
+	display(density(R_givens))
+end
 
 # ╔═╡ 2a00132b-4d2d-45e6-b2fb-3ab46f09f41c
 spy(A, title="Matriz original")
@@ -646,6 +659,45 @@ spy(R_householder,title="Matriz R con Householder QR con pivoteo")
 
 # ╔═╡ c4e572dd-5873-4cd7-aa4b-80f622c2aeb7
 spy(R_givens,title="Matriz R con Givens QR")
+
+# ╔═╡ a317e5d7-e1a0-4701-8392-aac44a303331
+md"### Experimento"
+
+# ╔═╡ 8dd73bd7-35a5-4f28-9f60-2b5e254358cc
+function density_experiment(n_trials::Int, n::Int, m::Int)
+    results = NamedTuple[]
+
+    for i in 1:n_trials
+        A = sprand(n, m, 0.01)
+
+        Q_householder, R_householder, Z_householder = qr_householder_with_pivot_results(A)
+
+        Q_givens, R_givens = givens_qr(A)
+
+        push!(results, (
+            trial = i,
+            density_A = density(A),
+            density_R_householder = density(R_householder),
+            density_R_givens = density(R_givens),
+        ))
+    end
+	return results
+end
+
+# ╔═╡ ecd6d15b-c4fe-4100-aef9-82b7b493f6ec
+densities = density_experiment(10,20,30)
+
+# ╔═╡ 3fd4b826-d38f-4339-ac9b-f1d1e905e496
+pretty_table(
+	densities; 
+	header=["Trial", "A", "R_Householder", "R_Givens"]
+)
+
+# ╔═╡ ce1ecfa4-7bc7-485a-9da2-de28a22aa04e
+md"
+### Resultado
+Tanto en el ejemplo como en el experimento, podemos ver que el algoritmo de Givens conserva mejor la dispersión de la matriz que el de Householder con pivoteo.
+"
 
 # ╔═╡ 9cce2e64-c3ee-461d-98f0-b7a3460046e8
 md"
@@ -664,19 +716,14 @@ Para **matrices dispersas**, las **rotaciones de Givens** son más adecuadas si 
 
 2. **Preservación del patrón disperso:** Las transformaciones de Givens pueden ser diseñadas para aprovechar los ceros ya presentes, omitiendo operaciones innecesarias. Esto es especialmente útil en aplicaciones como resolución de sistemas dispersos o álgebra lineal estructurada.
 
-3. **Control de llenado:** El llenado que se introduce por rotaciones de Givens está restringido al soporte conjunto de las filas que se modifican. En contraste, una sola reflexión de Householder puede densificar completamente una matriz dispersa, generando costos de almacenamiento y computación más altos.
+3. **Control de llenado:** El llenado que se introduce por rotaciones de Givens está restringido al soporte conjunto de las filas que se modifican. En contraste, una sola reflexión de Householder puede densificar completamente una matriz dispersa, generando costos de almacenamiento y computación más altos. Esta superioridad fue evaluada empíricamente en este cuaderno. 
 
-4. **Aplicabilidad práctica:** Aunque en teoría Householder es más eficiente para matrices densas (pues anula toda una columna de una vez), en matrices dispersas este “alcance” se vuelve perjudicial. En la práctica, Givens permite conservar ventajas estructurales que podrían ser esenciales, por ejemplo, en métodos iterativos o sistemas simbólicos.
+4. **Rapidez**
 
 "
 
-# ╔═╡ 977d0390-19a3-4bcf-ae75-8c6efdd38a85
-md"Givens, en caso de cero salta el paso re fácil
-Ambos pueden reemplazar ceros. Pero Givens modifica menos valores en cada paso, luego, puede reemplazar menos ceros.
-(Reemplazar Preservación con Alcance de cada transformación y Fill-in)
-
-Sin embargo, existe un paper que indica que algunas implementaciones de Householder podrían ser mejores que Givens incluso en matrices dispersas.
-"
+# ╔═╡ 8ceb7928-fb68-4ecf-a9ca-4e6fbc4195c6
+md"Hay uno que sí es mejor"
 
 # ╔═╡ ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 md"""
@@ -730,11 +777,13 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 BenchmarkTools = "~1.3.2"
 Plots = "~1.40.12"
+PrettyTables = "~2.4.0"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -743,7 +792,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "0bf26116c939d9ca188ad35ac452525c60778944"
+project_hash = "62f6c44ef9b32ab1aec122b8a9166d8b50e49e9e"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
@@ -848,6 +897,11 @@ git-tree-sha1 = "439e35b0b36e2e5881738abc8857bd92ad6ff9a8"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.3"
 
+[[deps.Crayons]]
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
+uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
+version = "4.1.1"
+
 [[deps.DataAPI]]
 git-tree-sha1 = "abe83f3a2f1b857aac70ef8b269080af17764bbe"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
@@ -858,6 +912,11 @@ deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
 git-tree-sha1 = "4e1fe97fdaed23e9dc21d4d664bea76b65fc50a0"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 version = "0.18.22"
+
+[[deps.DataValueInterfaces]]
+git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
+uuid = "e2d170a0-9d28-54be-80f0-106bbe20a464"
+version = "1.0.0"
 
 [[deps.Dates]]
 deps = ["Printf"]
@@ -1011,6 +1070,11 @@ version = "1.11.0"
 git-tree-sha1 = "e2222959fbc6c19554dc15174c81bf7bf3aa691c"
 uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
 version = "0.2.4"
+
+[[deps.IteratorInterfaceExtensions]]
+git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
+uuid = "82899510-4779-5014-852e-03e436cf321d"
+version = "1.0.0"
 
 [[deps.JLFzf]]
 deps = ["REPL", "Random", "fzf_jll"]
@@ -1342,6 +1406,12 @@ git-tree-sha1 = "9306f6085165d270f7e3db02af26a400d580f5c6"
 uuid = "21216c6a-2e73-6563-6e65-726566657250"
 version = "1.4.3"
 
+[[deps.PrettyTables]]
+deps = ["Crayons", "LaTeXStrings", "Markdown", "PrecompileTools", "Printf", "Reexport", "StringManipulation", "Tables"]
+git-tree-sha1 = "1101cd475833706e4d0e7b122218257178f48f34"
+uuid = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+version = "2.4.0"
+
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
@@ -1487,6 +1557,12 @@ git-tree-sha1 = "29321314c920c26684834965ec2ce0dacc9cf8e5"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 version = "0.34.4"
 
+[[deps.StringManipulation]]
+deps = ["PrecompileTools"]
+git-tree-sha1 = "725421ae8e530ec29bcbdddbe91ff8053421d023"
+uuid = "892a3eda-7b42-436c-8928-eab12a02cf0e"
+version = "0.4.1"
+
 [[deps.StyledStrings]]
 uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
 version = "1.11.0"
@@ -1500,6 +1576,18 @@ version = "7.7.0+0"
 deps = ["Dates"]
 uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 version = "1.0.3"
+
+[[deps.TableTraits]]
+deps = ["IteratorInterfaceExtensions"]
+git-tree-sha1 = "c06b2f539df1c6efa794486abfb6ed2022561a39"
+uuid = "3783bdb8-4a98-5b6b-af9a-565f29a5fe9c"
+version = "1.0.1"
+
+[[deps.Tables]]
+deps = ["DataAPI", "DataValueInterfaces", "IteratorInterfaceExtensions", "OrderedCollections", "TableTraits"]
+git-tree-sha1 = "598cd7c1f68d1e205689b1c2fe65a9f85846f297"
+uuid = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
+version = "1.12.0"
 
 [[deps.Tar]]
 deps = ["ArgTools", "SHA"]
@@ -1912,18 +2000,22 @@ version = "1.4.1+2"
 # ╠═36b4511c-6531-46e4-bc66-a4cc75fbb87f
 # ╠═41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 # ╠═20d9b30e-b85f-4087-a74f-d452a13c325f
-# ╠═13be06d6-7213-43e9-96c6-ebadc25b13f8
 # ╠═65e755c0-3910-4427-b9d1-663e4539a893
-# ╠═cbf02f31-d55e-46f4-85fb-800ec902e54c
+# ╟─cbf02f31-d55e-46f4-85fb-800ec902e54c
+# ╠═0e88256e-3dd1-46fe-a64c-ba5d2cbe200b
+# ╟─e743312f-1c13-4e3c-ba1c-e71d0b9109b1
 # ╠═8001cf5a-123d-411d-bee5-d218745823dc
-# ╠═0bd64eb8-8083-4aaf-b36d-8b71de1dbf74
-# ╠═4f226f6a-543c-4876-9ead-fafa86decc29
-# ╠═aa5998fd-184b-4a89-84f2-90ca8765f80e
+# ╠═028e9a85-8a6b-41af-970b-72d337375083
 # ╠═2a00132b-4d2d-45e6-b2fb-3ab46f09f41c
 # ╠═fe1a52e8-c9bb-485e-86eb-fd0728eee79b
 # ╠═c4e572dd-5873-4cd7-aa4b-80f622c2aeb7
+# ╠═a317e5d7-e1a0-4701-8392-aac44a303331
+# ╠═8dd73bd7-35a5-4f28-9f60-2b5e254358cc
+# ╠═ecd6d15b-c4fe-4100-aef9-82b7b493f6ec
+# ╠═3fd4b826-d38f-4339-ac9b-f1d1e905e496
+# ╠═ce1ecfa4-7bc7-485a-9da2-de28a22aa04e
 # ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
-# ╠═977d0390-19a3-4bcf-ae75-8c6efdd38a85
+# ╠═8ceb7928-fb68-4ecf-a9ca-4e6fbc4195c6
 # ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 # ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
 # ╟─00000000-0000-0000-0000-000000000001
