@@ -102,7 +102,7 @@ end
 
 # ╔═╡ e9d5027a-719a-460c-8529-7e2a5fbd73d3
 """
-    qr_householder_pivoting(A) -> A_out, piv, r
+    qr_householder_with_pivot(A) -> A_out, piv, r
 
 Algoritmo 5.4.1: QR con pivoteo por columnas. Sobrescribe la matriz `A`:
 - Parte superior triangular contiene `R`,
@@ -179,46 +179,6 @@ function qr_householder_with_pivot_results(A)
 	Z = I(n)[:, piv]' 
 	return Q, R, Z
 end
-
-# ╔═╡ ad100da0-c243-4335-9a59-947989b46da7
-function qr_householder_pivoting(A; tol=1e-12)
-    m, n = size(A)
-    R = copy(A)
-    Q = Matrix{Float64}(I, m, m)
-    Z = Matrix{Float64}(I, n, n)
-    col_norms = vec(norm.(eachcol(R)))
-
-    for k in 1:min(m, n)
-        # Elegir la columna con norma más grande
-        _, max_col_idx = findmax(col_norms[k:end])
-        j = k - 1 + max_col_idx
-
-        # Intercambiar columnas en R y Z
-        R[:, [k, j]] = R[:, [j, k]]
-        Z[:, [k, j]] = Z[:, [j, k]]
-        col_norms[[k, j]] = col_norms[[j, k]]
-
-        # Vector de Householder
-        x = R[k:end, k]
-        v = copy(x)
-        v[1] += sign(x[1]) * norm(x)
-        v /= norm(v)
-
-        # Aplicar la reflexión a R
-        R[k:end, k:end] .-= 2 * v * (v' * R[k:end, k:end])
-
-        # Aplicar la reflexión a Q
-        Q[:, k:end] .-= 2 * (Q[:, k:end] * v) * v'
-
-        # Actualizar normas restantes (opcional: mejora rendimiento)
-        for j in k+1:n
-            col_norms[j] = norm(R[k+1:end, j])
-        end
-    end
-
-    return Q, R, Z
-end
-
 
 # ╔═╡ 1f1fa94d-cd90-42bf-8480-88cc87e936ac
 md"
@@ -298,7 +258,7 @@ md"
 #### Evaluación del error del algoritmo
 En esta sección analizaremos si el error del algoritmo cambia si en la matriz hay columnas dependientes o casi dependientes.
 
-Para evaluar el error utilizaremos `error_norm_qr_householder_pivoting`, la cual halla la diferencia entre la matriz original y la matriz reconstruida a partir de la descomposición QR generada por `qr_householder_pivoting`.
+Para evaluar el error utilizaremos `error_norm_qr_householder_pivoting`, la cual halla la diferencia entre la matriz original y la matriz reconstruida a partir de la descomposición QR generada por `qr_householder_with_pivot`.
 "
 
 # ╔═╡ 355cab0f-012f-4dff-9cb6-9f7135319487
@@ -352,20 +312,20 @@ md"
 #### Variando la casi dependencia de las columnas: 
 Evaluemos los cambios en el error al modificar la casi dependencia de las columnas.
 
-Para esto, graficamos el error de la reconstrucción QR con `error_norm_qr_householder_pivoting` para diferentes tres matrices con columnas casi dependientes.
+Para esto, graficamos el error de la reconstrucción QR con `error_norm_qr_householder_pivoting` para tres matrices con columnas casi dependientes.
 "
 
 # ╔═╡ df51f2eb-b090-4084-9fc5-6454e0f0a5df
 begin
 	AExample1 = gen_dependent_matrix(4,3)
-	AExample2 = gen_dependent_matrix(4,3)
-	AExample3 = gen_dependent_matrix(4,3)
+	AExample2 = gen_dependent_matrix(10,10)
+	AExample3 = gen_dependent_matrix(50,50)
 	display(AExample1)
 end
 
 # ╔═╡ 3086fcf9-a97b-4b80-8dcf-ea069c7adccb
 function graph_householder_error_for_almost_dependent_matrices(range)
-	title = "Error para diferencias de hasta " * string(last(range))
+	title = "Error para diferencias de hasta " * string(max_absolute_value_of(range))
 	plot(
 		range, 
 		[error_norm_qr_householder_pivoting(mod_dependent_matrix(AExample1,xi)) for xi in range], 
@@ -391,27 +351,16 @@ end
 graph_householder_error_for_almost_dependent_matrices(range(-5, 5, length=500))
 
 # ╔═╡ f9f4bf3f-c73f-4eac-b430-8cad5e072b94
-graph_householder_error_for_almost_dependent_matrices(range(-.5, .5, length=500))
+graph_householder_error_for_almost_dependent_matrices(range(-.1, .1, length=500))
 
 # ╔═╡ a8c14878-ee23-45f4-a775-f9dd30545d3f
-graph_householder_error_for_almost_dependent_matrices(range(-.001, .001, length=500))
-
-# ╔═╡ 8898e3d0-3bf4-42c7-bb38-cbec5c2a0692
-graph_householder_error_for_almost_dependent_matrices(range(-.00001, .00001, length=500))
+graph_householder_error_for_almost_dependent_matrices(range(-.001, .0009, length=500))
 
 # ╔═╡ e58f7432-b071-48c2-8683-76d7abbad4f1
 md"
 #### Resultados
-Observamos que:
 
-| Máxima diferencia | Máximo error (aprox) |
-|-----|----|
-|5.0  |$1.2*10^{-12}$|
-|0.5  |$1.2*10^{-12}$|
-|$1*10^{-3}$  |$6*10^{-14}$|
-|$1*10^{-5}$  |$8*10^{-15}$|
-
-Al comparar las gráficas de los diferentes rangos, podemos ver que el valor máximo disminuye a medida que disminuye el rango.
+Al comparar las gráficas de los diferentes rangos, no hay una diferencia aparente en la norma del error al variar la casi dependencia de las matrices
 "
 
 # ╔═╡ dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
@@ -458,11 +407,12 @@ end
 graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-1, 1, length=50), 50)
 
 # ╔═╡ f81c8526-ee98-48cd-99f0-ffaad54aa289
-graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-.1, .1, length=10), 50)
+graph_benchmark_householder_pivot_qr_for_almost_dependent_columns(range(-.05, .05, length=10), 50)
 
 # ╔═╡ 6aabdc0e-c854-48f1-af38-98d2376bfaea
 md"""
 #### Resultados
+No hay un patron aparente de cambios en el tiempo de ejecucion al modificar la casi dependencia de las columnas
 """
 
 # ╔═╡ 735b730a-f3a5-4f60-96df-39388326b05c
@@ -542,8 +492,6 @@ La *rotación de Givens* implica una rotación ortogonal en el plano $(i, j)$ qu
 | **Alcance de cada transformación**                              | Global: afecta toda la submatriz inferior derecha.                                                                                          | Local: modifica únicamente dos filas (i, j) de la matriz.                                                          | **Givens** (mejor preservación local)                                                      |
 | **Preservación de la estructura dispersa**                      | Mala: la aplicación de una reflexión global introduce nuevos elementos no nulos (fill-in) en muchas posiciones.                             | Buena: al modificar solo dos filas, el patrón de dispersión se mantiene en gran medida.                            | **Givens** (preserva mejor la dispersión)                                                  |
 | **Fill-in (llenado de ceros)**                                  | Alto: cada paso puede transformar columnas y filas escasamente pobladas en densas.                                                          | Bajo: el llenado se restringe al soporte conjunto de las filas involucradas.                                       | **Givens** (mínimo fill-in)                                                                |                                             |
-| **Costo computacional por transformación**                      | $\mathcal{O}(mn)$ por reflexión (en el caso general), pues afecta múltiples columnas y filas.                                               | $\mathcal{O}(n)$ por rotación (en promedio), afectando solo dos filas.                                             | **Givens** (mejor costo local)                                                             |
-| **Número total de transformaciones**                            | $\min(m, n)$: una reflexión por columna.                                                                                                    | Hasta $\frac{n(n-1)}{2}$ en el peor caso (aunque muchas operaciones pueden omitirse si los elementos ya son cero). | **Empate** (Householder usa menos transformaciones, Givens puede optimizarse en dispersos) |
 "
 
 # ╔═╡ 3df82014-b96d-4b01-bd1e-57d76831a118
@@ -616,12 +564,12 @@ end
 md" ##### Resultados
 En ambos experimento, el algoritmo de Givens QR es más rápido que el de Householder QR con pivoteo.
 
-Sin embargo, para las matrices densas, la diferencia es ligera. Mientras que, para las matrices dispersas, la diferencia es importante.
+Sin embargo, para las matrices densas, la diferencia crece de manera lineal. Mientras que, para las matrices dispersas, la diferencia crece de manera exponencial.
 "
 
 # ╔═╡ cbf02f31-d55e-46f4-85fb-800ec902e54c
 md"
-## De llenado de ceros
+### De llenado de ceros
 Evaluemos la conservación de la matriz dispersa de ambos métodos.
 "
 
@@ -661,7 +609,7 @@ spy(R_householder,title="Matriz R con Householder QR con pivoteo")
 spy(R_givens,title="Matriz R con Givens QR")
 
 # ╔═╡ a317e5d7-e1a0-4701-8392-aac44a303331
-md"### Experimento"
+md"#### Experimento"
 
 # ╔═╡ 8dd73bd7-35a5-4f28-9f60-2b5e254358cc
 function density_experiment(n_trials::Int, n::Int, m::Int)
@@ -695,7 +643,7 @@ pretty_table(
 
 # ╔═╡ ce1ecfa4-7bc7-485a-9da2-de28a22aa04e
 md"
-### Resultado
+#### Resultados
 Tanto en el ejemplo como en el experimento, podemos ver que el algoritmo de Givens conserva mejor la dispersión de la matriz que el de Householder con pivoteo.
 "
 
@@ -708,22 +656,15 @@ Justifique su respuesta en términos de:
 * las operaciones necesarias y 
 * el patrón de llenado (fill-in).
 
-Para **matrices dispersas**, las **rotaciones de Givens** son más adecuadas si el objetivo es **preservar la estructura dispersa** y **minimizar el llenado (fill-in)** durante la factorización QR.
+Para **matrices dispersas**, las **rotaciones de Givens** son más adecuadas si el objetivo es **preservar la estructura dispersa** y **minimizar el llenado (fill-in)** durante la factorización QR. Esto fue constatado en el experimento de llenado de ceros.
 
-**Justificación:**
+Ademas, conceptualmente esto tiene sentido, teniendo en cuenta:
 
-1. **Estructura local:** Givens modifica únicamente dos filas por vez. Esto evita que un cero en una fila se transforme en un valor no nulo por la propagación de una transformación global, como ocurre en Householder.
+1. **El aprovechamiento del patrón disperso:** El algoritmo de Givens aprovecha los ceros ya presentes, omitiendo operaciones innecesarias. Esto se ve reflejado en la diferencia de tiempo evaluada en este cuaderno.
 
-2. **Preservación del patrón disperso:** Las transformaciones de Givens pueden ser diseñadas para aprovechar los ceros ya presentes, omitiendo operaciones innecesarias. Esto es especialmente útil en aplicaciones como resolución de sistemas dispersos o álgebra lineal estructurada.
-
-3. **Control de llenado:** El llenado que se introduce por rotaciones de Givens está restringido al soporte conjunto de las filas que se modifican. En contraste, una sola reflexión de Householder puede densificar completamente una matriz dispersa, generando costos de almacenamiento y computación más altos. Esta superioridad fue evaluada empíricamente en este cuaderno. 
-
-4. **Rapidez**
+2. **El control de llenado:** El llenado que se introduce por rotaciones de Givens está restringido al soporte conjunto de las filas que se modifican. En contraste, una sola reflexión de Householder puede densificar completamente una matriz dispersa, generando costos de almacenamiento y computación más altos.
 
 "
-
-# ╔═╡ 8ceb7928-fb68-4ecf-a9ca-4e6fbc4195c6
-md"Hay uno que sí es mejor"
 
 # ╔═╡ ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 md"""
@@ -763,14 +704,6 @@ La IA fue utilizada de manera responsable como herramienta de apoyo técnico y p
 * *Matrix Computations*, Golub & Van Loan
 """
 
-# ╔═╡ b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
-md"
-## TO DO
-- [ ] time householder
-- [ ] spy fill-in
-- [ ] Rewrite
-"
-
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -790,7 +723,7 @@ PrettyTables = "~2.4.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.1"
+julia_version = "1.11.5"
 manifest_format = "2.0"
 project_hash = "62f6c44ef9b32ab1aec122b8a9166d8b50e49e9e"
 
@@ -1305,7 +1238,7 @@ version = "0.3.27+1"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.5+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -1941,9 +1874,9 @@ version = "1.4.1+2"
 """
 
 # ╔═╡ Cell order:
-# ╠═4f16bf43-ed9a-4e2b-8e41-600b8a4b0ea4
+# ╟─4f16bf43-ed9a-4e2b-8e41-600b8a4b0ea4
 # ╟─0d4e1dfc-3232-11f0-1549-17244c3a3ae6
-# ╠═c6cbde37-2796-4867-b5f2-a918672749ad
+# ╟─c6cbde37-2796-4867-b5f2-a918672749ad
 # ╠═4fb5a702-eea7-4d84-b5cf-48f5f98c3a0d
 # ╟─dce5fe61-66f5-4e43-a460-4299b8ce21a9
 # ╠═c269a7b8-93fc-4cdb-bfb9-9ab3ed3e1c1c
@@ -1951,14 +1884,13 @@ version = "1.4.1+2"
 # ╠═fdd67542-eb97-4159-ac52-55235541cd89
 # ╠═44c341fa-b702-48b7-afe4-5e329b3a8317
 # ╠═7aef6c03-114b-48b6-9fe7-3f52375b37ab
-# ╠═ad100da0-c243-4335-9a59-947989b46da7
-# ╠═1f1fa94d-cd90-42bf-8480-88cc87e936ac
+# ╟─1f1fa94d-cd90-42bf-8480-88cc87e936ac
 # ╠═4e3fa428-1811-41d4-8e0c-4e47985536f7
 # ╠═a2067dcf-ce34-4efb-91eb-fdf9e9a259fe
 # ╠═4e529288-d039-49ca-b298-295d60b6e99e
 # ╠═c92f4eab-1462-49ff-8ef5-a5a5db663209
 # ╠═9bb2ebde-f43d-4111-b1f0-706e4be8c50f
-# ╠═6ffc7d62-400d-441f-9905-c79ebb2eb38d
+# ╟─6ffc7d62-400d-441f-9905-c79ebb2eb38d
 # ╠═0619059d-68dd-4e83-b725-551b5f8a4d0c
 # ╠═33904f82-3141-4263-b5d6-1c9f71c91c13
 # ╠═9d8bda6d-69bd-485b-8c21-f012e42884d7
@@ -1971,13 +1903,12 @@ version = "1.4.1+2"
 # ╠═a985046b-3b89-4b81-8626-615ff1efb852
 # ╠═cb654ecc-8917-4777-9f7e-c051f045d96b
 # ╟─a52dc169-d858-484a-8ece-b6c03ba7933f
-# ╠═4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
+# ╟─4f3b57d3-26a7-47d2-a3e9-abb67ec92a7e
 # ╠═df51f2eb-b090-4084-9fc5-6454e0f0a5df
 # ╠═3086fcf9-a97b-4b80-8dcf-ea069c7adccb
 # ╠═a0ac0068-0638-4a71-af95-8f78b2c14e32
 # ╠═f9f4bf3f-c73f-4eac-b430-8cad5e072b94
 # ╠═a8c14878-ee23-45f4-a775-f9dd30545d3f
-# ╠═8898e3d0-3bf4-42c7-bb38-cbec5c2a0692
 # ╟─e58f7432-b071-48c2-8683-76d7abbad4f1
 # ╟─dc690a4f-0914-43f6-a6c5-ac3d66f2c32c
 # ╠═f0d694a0-12ca-4438-ac7c-6f10f6855b10
@@ -1985,22 +1916,22 @@ version = "1.4.1+2"
 # ╠═1f6fac45-2cd5-4123-bbbc-2a033a09ddd2
 # ╠═fe359240-bcc5-4644-b4bc-306e2a70ffca
 # ╠═f81c8526-ee98-48cd-99f0-ffaad54aa289
-# ╠═6aabdc0e-c854-48f1-af38-98d2376bfaea
+# ╟─6aabdc0e-c854-48f1-af38-98d2376bfaea
 # ╟─735b730a-f3a5-4f60-96df-39388326b05c
 # ╟─cf2db2a0-0d20-4e5d-95bf-9ef3287cfc97
 # ╠═d4367062-65de-49a7-9bd4-14851c9b9853
 # ╠═a7f97197-6a32-4d06-b35e-25de66c0aab5
-# ╠═2e5b592c-2e88-4552-9788-a31d7be04ad1
-# ╠═3df82014-b96d-4b01-bd1e-57d76831a118
+# ╟─2e5b592c-2e88-4552-9788-a31d7be04ad1
+# ╟─3df82014-b96d-4b01-bd1e-57d76831a118
 # ╠═e03a43e2-78da-4e19-99f8-aa694bf33675
 # ╠═37ffd6f2-07f6-411f-b7c1-78dec8c19ff6
-# ╠═8dfc99fb-ab20-46f0-baef-464111c78ee0
+# ╟─8dfc99fb-ab20-46f0-baef-464111c78ee0
 # ╠═bf43a9d8-62de-47e6-bf60-2111f9a01b03
 # ╠═cd9e41cc-eca0-4db3-a675-80a20397149b
-# ╠═36b4511c-6531-46e4-bc66-a4cc75fbb87f
+# ╟─36b4511c-6531-46e4-bc66-a4cc75fbb87f
 # ╠═41e3ed42-9af4-4e00-b0be-ea4565f9bc67
 # ╠═20d9b30e-b85f-4087-a74f-d452a13c325f
-# ╠═65e755c0-3910-4427-b9d1-663e4539a893
+# ╟─65e755c0-3910-4427-b9d1-663e4539a893
 # ╟─cbf02f31-d55e-46f4-85fb-800ec902e54c
 # ╠═0e88256e-3dd1-46fe-a64c-ba5d2cbe200b
 # ╟─e743312f-1c13-4e3c-ba1c-e71d0b9109b1
@@ -2009,14 +1940,12 @@ version = "1.4.1+2"
 # ╠═2a00132b-4d2d-45e6-b2fb-3ab46f09f41c
 # ╠═fe1a52e8-c9bb-485e-86eb-fd0728eee79b
 # ╠═c4e572dd-5873-4cd7-aa4b-80f622c2aeb7
-# ╠═a317e5d7-e1a0-4701-8392-aac44a303331
+# ╟─a317e5d7-e1a0-4701-8392-aac44a303331
 # ╠═8dd73bd7-35a5-4f28-9f60-2b5e254358cc
 # ╠═ecd6d15b-c4fe-4100-aef9-82b7b493f6ec
 # ╠═3fd4b826-d38f-4339-ac9b-f1d1e905e496
-# ╠═ce1ecfa4-7bc7-485a-9da2-de28a22aa04e
-# ╠═9cce2e64-c3ee-461d-98f0-b7a3460046e8
-# ╠═8ceb7928-fb68-4ecf-a9ca-4e6fbc4195c6
-# ╠═ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
-# ╠═b4bd7c1c-1ca3-4470-867e-e73cbbc128a7
+# ╟─ce1ecfa4-7bc7-485a-9da2-de28a22aa04e
+# ╟─9cce2e64-c3ee-461d-98f0-b7a3460046e8
+# ╟─ea8df5dd-15a8-4acd-bfba-ebf2d5fe2f31
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
