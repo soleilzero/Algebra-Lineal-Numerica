@@ -26,7 +26,7 @@ md"
 # ╔═╡ 1b901f7e-934b-4044-9514-687914d1bde4
 md"
 ### Implementación
-#### #1 Sin desplazamiento
+#### Código original
 
 Primero, mejoramos el código de Givens trabajado en la última tarea
 "
@@ -69,6 +69,7 @@ end
 
 # ╔═╡ 7c313dea-4379-44d9-bf91-91bfc21db53d
 md"
+#### Subfunciones
 Lo modularizamos para mejorar su claridad. Tenemos cuidado de tratar con `views` para no tener copias temporales.
 
 Además, añadimos la capacidad de utilizar un shift fijo.
@@ -140,18 +141,32 @@ function accumulate_q!(Q, i, c, s)
     end
 end
 
-# ╔═╡ 45b4c289-8b91-495f-b90b-eb2a53eafa9b
+# ╔═╡ 5afdb1df-663c-4264-8d72-038664900424
+md"
+### Funciones principales
+Para shift estático y dinámico
+"
+
+# ╔═╡ a221ebbc-1836-4954-9d45-21f1bdece6dd
 """
-    givens_qr(A)
+    givens_qr(A; u=0.0, hessenberg=false)
 
 Devuelve las matrices Q y R tales que A ≈ QR usando rotaciones de Givens.
+Puede aplicar un desplazamiento o una reducción previa a forma de Hessenberg.
 """
-function givens_qr(A, u = 0)
-    A = copy(Matrix(A))  # Asumimos que A es densa o se puede convertir
-    m, n = size(A)
-    Q = Matrix{eltype(A)}(I, m, m)
+function givens_qr(A; reduce_hessenberg=false, shift=false)
+	u = 0.0
+    if reduce_hessenberg
+        A = copy(hessenberg(A).H)   # F.Q no se usa aquí, solo la matriz reducida
+	else
+		A = copy(A)  # Trabajamos sobre copia
+	end
 
-	if u ≠ 0.0
+    m, n = size(A)
+    Q_matrix = Matrix{eltype(A)}(I, m, m)
+
+    if shift == true
+		u = A[n,n]
         apply_shift!(A, u)
     end
 
@@ -160,16 +175,19 @@ function givens_qr(A, u = 0)
             a, b = A[i-1, j], A[i, j]
             c, s = compute_givens(a, b)
             rotate_rows!(A, i, c, s, j:n)
-            accumulate_q!(Q, i, c, s)
+            accumulate_q!(Q_matrix, i, c, s)
         end
     end
 
-	if u ≠ 0.0
+    if shift == true
         apply_shift!(A, -u)
     end
 
-    return Q, triu(A)
+    return Q_matrix, triu(A)
 end
+
+# ╔═╡ d84e9b74-104b-43c1-ba8f-63daa37fa09c
+md" #### Algoritmo optimizado"
 
 # ╔═╡ be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
 md" #### Example"
@@ -177,8 +195,8 @@ md" #### Example"
 # ╔═╡ 03b315ab-f03a-4749-93d7-b63a17ac4a28
 begin
 	
-	A = randn(5, 4)           # matriz rectangular (m > n)
-	Q, R = givens_qr(A)
+	A = randn(5, 5)           # matriz rectangular (m > n)
+	Q, R = givens_qr(A, reduce_hessenberg=true)
 	A_recon = Q * R
 	
 	@show norm(A - A_recon)         # debe ser ≈ 1e-13 o menos
@@ -202,7 +220,8 @@ md"
 # ╔═╡ d2390c89-50e9-4d78-8d46-72e05529f61a
 function benchmark_givens_methods(ns)
     times_givens_no_shift = Float64[]
-    times_givens_with_shift = Float64[]
+    times_givens_with_hessenberg = Float64[]
+    times_givens_with_hessenberg_and_shift = Float64[]
 
     for n in ns
 		A = randn(n, n)
@@ -210,30 +229,34 @@ function benchmark_givens_methods(ns)
         push!(times_givens_no_shift, 
 			@belapsed givens_qr($A)
 		)
-        push!(times_givens_with_shift, 
-			@belapsed givens_qr($A)
+        push!(times_givens_with_hessenberg, 
+			@belapsed givens_qr($A, reduce_hessenberg=true)
+		)
+		push!(times_givens_with_hessenberg_and_shift, 
+			@belapsed givens_qr($A, reduce_hessenberg=true, shift=true)
 		)
     end
 
-    return times_givens_no_shift, times_givens_with_shift
+    return times_givens_no_shift, times_givens_with_hessenberg, times_givens_with_hessenberg_and_shift
 end
 
 # ╔═╡ 7054e57e-159d-43a4-a01b-ac5a496dec6e
-ns = 10:100:1010  # Tamaños de matrices
+ns = 10:250:1010  # Tamaños de matrices
 
 # ╔═╡ 89e2e7bb-e058-4ed8-955c-8fb5994ad799
 times = benchmark_givens_methods(ns)
 
 # ╔═╡ cb0476d7-3ace-4d0e-8df5-d9f0ddd8172f
-plot(
-	range, 
-	times, 
-	xlabel="Diferencia `x` entre columnas casi dependientes", 
-	ylabel="Tiempo (s)", 
-	title= "Tiempo para diferencias de hasta ", 
-	legend=true,
-	label="AExample1"
-)
+begin
+	plot(ns,times[1], marker=:+, label="Basic")
+	plot!(ns,times[2], marker=:+, label="With Hessennberg")
+	plot!(ns, times[3], marker=:+, label="With Hessennberg and shift")
+	
+	xlabel!("Tamaño de la matrix cuadrada")
+	ylabel!("Tiempo (s)")
+	title!("Comparación de tiempo")
+
+end
 
 # ╔═╡ 1b110c4f-ee01-4328-afba-85f3a8b41f96
 
@@ -1370,12 +1393,14 @@ version = "1.4.1+2"
 # ╠═b0581d93-b1b9-41e2-9e2f-fede19457913
 # ╠═1b901f7e-934b-4044-9514-687914d1bde4
 # ╠═185f632d-3fb4-4a3d-adf7-ce6958c9c96e
-# ╠═7c313dea-4379-44d9-bf91-91bfc21db53d
+# ╟─7c313dea-4379-44d9-bf91-91bfc21db53d
 # ╠═cacc4b88-6533-4f42-a9cd-f55bce2331ec
 # ╠═4aa7503f-fe36-490c-97bd-57bf7fa14ae2
 # ╠═e1f0ae1e-0703-461c-b82b-f97ed64f347c
 # ╠═ad0522e5-eaab-4042-9811-34d012b5172d
-# ╠═45b4c289-8b91-495f-b90b-eb2a53eafa9b
+# ╠═5afdb1df-663c-4264-8d72-038664900424
+# ╠═a221ebbc-1836-4954-9d45-21f1bdece6dd
+# ╠═d84e9b74-104b-43c1-ba8f-63daa37fa09c
 # ╠═be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
 # ╠═03b315ab-f03a-4749-93d7-b63a17ac4a28
 # ╠═17e34d57-a674-407b-bccc-4d9d04287731
