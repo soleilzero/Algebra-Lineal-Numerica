@@ -52,7 +52,7 @@ Aceleración de convergencia
 Eficiencia en algoritmos modernos (desplazamientos—explícitos o implícitos—incrementan el aislamiento de subbloques triangulares de la matriz, reduciendo rápidamente la parte activa del problema)
 "
 
-# ╔═╡ fc842fbc-fdb0-40f5-a915-9365fecbc689
+# ╔═╡ 06a284b8-ab2d-4b12-9153-5f8e88485e78
 md"
 ## Teoría 
 
@@ -76,10 +76,7 @@ Por tanto, todas las $A_k$ son similares a la original $A$, y tienen los mismos 
 
 Bajo ciertas condiciones (e.g., $A$ simétrica), las $A_k$ convergen a una matriz diagonal cuya diagonal contiene los autovalores de $A$.
 
-"
-
-# ╔═╡ 06a284b8-ab2d-4b12-9153-5f8e88485e78
-md"#### Convergencia
+#### Convergencia
 
 Este tema es tratado en la sección 7.3.3 del libro.
 
@@ -116,33 +113,19 @@ Más específicamente, los elementos subdiagonales de $A^{(k)}$ se atenúan con 
 
 $|(A^{(k)})_{i+1, i}| = O\left(\left|\frac{\lambda_{i+1}}{\lambda_i}\right|^k\right).$
 
----
+Es decir que el algoritmo QR sin shift **converge linealmente**, y su velocidad depende del cociente entre valores propios consecutivos. La convergencia puede ser muy lenta si los valores propios están cercanos en magnitud.
 
-##### 🔎 Implicación
-
-El algoritmo QR sin shift **converge linealmente**, y su velocidad depende del cociente entre valores propios consecutivos. La convergencia puede ser muy lenta si los valores propios están cercanos en magnitud.
-
-"
-
-# ╔═╡ 426fd5a1-0a08-4c18-a7c1-4326247008be
-md"
-
-#### Estabilidad y precision
-La **estabilidad y precisión** del método QR básico están ligadas principalmente a dos aspectos: la naturaleza ortogonal de las transformaciones implicadas (que es muy favorable numéricamente) y la forma en que se realiza la factorización QR en cada iteración.
-
-##### 📏 Estabilidad del método QR básico
+##### Estabilidad del método QR básico
 
 El método QR se basa en transformaciones ortogonales (o unitarias, en el caso complejo), las cuales son numéricamente estables porque **preservan la norma 2** y no amplifican los errores de redondeo. En cada paso, se realiza una transformación de similaridad de la forma:
 
 $A_{k+1} = Q_k^\top A_k Q_k$
 
-Estas transformaciones no degradan la condición del problema ni introducen inestabilidad inherente. Por esta razón, **el método QR es considerado *numéricamente estable hacia adelante***: los autovalores obtenidos son aproximaciones fiables de los autovalores exactos de la matriz original, dentro de los límites del error de redondeo.
-
-Cuando se emplea la forma de Hessenberg para optimizar el cálculo (como es habitual), esta estabilidad se mantiene porque la reducción a Hessenberg también se hace con transformaciones ortogonales.
+Estas transformaciones no degradan la condición del problema ni introducen inestabilidad inherente. Por esta razón, el método QR es considerado numéricamente estable: los autovalores obtenidos son aproximaciones fiables de los autovalores exactos de la matriz original, dentro de los límites del error de redondeo.
 
 ---
 
-#### 📐 Precisión del método QR básico
+#### Precisión del método QR básico
 
 La precisión en los autovalores calculados depende principalmente de:
 
@@ -154,13 +137,6 @@ Según el análisis de Golub y Van Loan, el método QR aplicado a una matriz sim
 $|\hat{\lambda}_i - \lambda_i| \approx u \|A\|_2$
 
 donde $u$ es la unidad de redondeo (por ejemplo, $u \approx 10^{-16}$ en doble precisión), y $\|A\|_2$ es la norma espectral de la matriz.
-
-Para los autovectores, la precisión depende de la **separación espectral**: si los autovalores están muy cerca unos de otros, los autovectores asociados pueden ser mal determinados (alta sensibilidad).
-
-#### Limitaciones
-* Convergencia lenta en algunos casos.
-
-* Sensibilidad a la cercanía entre autovalores.
 "
 
 # ╔═╡ 891fb287-b56b-46e1-bd7c-93eb7ca4c9ad
@@ -173,6 +149,9 @@ Dado que la velocidad de convergencia del método QR básico es el cociente entr
 ### Definición
 
 Sea $A \in \mathbb{R}^{n \times n}$ una matriz real. El **método QR con desplazamiento** es una variante del algoritmo QR clásico que acelera la convergencia mediante la incorporación de un escalar $\mu_k \in \mathbb{R}$ en cada iteración.
+
+##### Tipos
+Estático vs dinámico
 
 #### Esquema general de la iteración
 
@@ -188,9 +167,7 @@ Dado $A_0 := A$, para cada $k \geq 0$ realizamos:
 
    $A_{k+1} = R_k Q_k + \mu_k I$
 
-
-
-##### Justificación algebraica
+##### Justificación algebraica del shift estático
 Esta operación puede reescribirse como:
 $A_{k+1} = Q_k^\top A_k Q_k$,
 debido a que:
@@ -205,24 +182,22 @@ $=R_k Q_k +\mu I$
 
 $= A_k$
 
-
 Esto implica que $A_{k+1} \sim A_k \sim A$: la matriz resultante es similar a la anterior, y por tanto **preserva los autovalores**. En otras palabras, el método QR con shift genera una sucesión de matrices similares entre sí.
-
-##### Elección del desplazamiento
-
-"""
-
-# ╔═╡ c52082a2-a03a-467c-b2b8-6168a2579f2a
-md"
 
 #### Forma de Hessenberg
 Las matrices de Hessenberg
 ...
-#### Elección del desplazamiento de u_k
+#### Elección del desplazamiento
+#### Variando el desplazamiento
+Escogiendo $h_{nn}$ cada vez.
 
-#### Estabilidad
-#### Complejidad
-"
+#### Convergencia
+La convergencia es lineal, y el cociente espectral afecta el ritmo de convergencia:
+$\bigg|\frac{\lambda_{i+1}−u}{\lambda_i−u}\bigg|^k.$ (Analizado en la sección 7.5.2)
+
+
+Un shift estático no induce deflación rápida, a diferencia del shift dinámico basado en Rayleigh o Wilkinson. 
+"""
 
 # ╔═╡ e4c54b68-e57e-4dc4-ba2e-bdc055ec67ba
 md"
@@ -340,13 +315,10 @@ md"
 
 # ╔═╡ Cell order:
 # ╟─c478a7cc-42b0-11f0-1c45-919167ce835a
-# ╠═17dbbafe-fe46-4001-a1a0-5636395e89d8
-# ╠═5a04ad92-ed1f-4674-858a-f36de9a335a4
-# ╠═fc842fbc-fdb0-40f5-a915-9365fecbc689
+# ╟─17dbbafe-fe46-4001-a1a0-5636395e89d8
+# ╟─5a04ad92-ed1f-4674-858a-f36de9a335a4
 # ╠═06a284b8-ab2d-4b12-9153-5f8e88485e78
-# ╠═426fd5a1-0a08-4c18-a7c1-4326247008be
 # ╠═891fb287-b56b-46e1-bd7c-93eb7ca4c9ad
-# ╠═c52082a2-a03a-467c-b2b8-6168a2579f2a
-# ╠═e4c54b68-e57e-4dc4-ba2e-bdc055ec67ba
-# ╠═6db839bb-ea7b-486d-9ef0-19d476273b85
+# ╟─e4c54b68-e57e-4dc4-ba2e-bdc055ec67ba
+# ╟─6db839bb-ea7b-486d-9ef0-19d476273b85
 # ╠═16b57aca-a13d-4774-8f58-17b795e58c01
