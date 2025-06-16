@@ -14,13 +14,6 @@ end
 # ╔═╡ 83f28dee-479c-11f0-1d09-13dd69989556
 md"
 ## Análisis computacional
-### Implementación
-#### #1
-#### #2
-### Comparación de tiempo
-#### Con matrices normales y de Hessenberg
-#### Diferencias de tamaño
-### Comparación de estabilidad numérica
 "
 
 # ╔═╡ 1b901f7e-934b-4044-9514-687914d1bde4
@@ -69,7 +62,7 @@ end
 
 # ╔═╡ 7c313dea-4379-44d9-bf91-91bfc21db53d
 md"
-#### Subfunciones
+#### Funciones secundarias
 Lo modularizamos para mejorar su claridad. Tenemos cuidado de tratar con `views` para no tener copias temporales.
 
 Además, añadimos la capacidad de utilizar un shift fijo.
@@ -143,60 +136,113 @@ end
 
 # ╔═╡ 5afdb1df-663c-4264-8d72-038664900424
 md"
-### Funciones principales
-Para shift estático y dinámico
+### Funciones para la descomposición QR
 "
 
 # ╔═╡ a221ebbc-1836-4954-9d45-21f1bdece6dd
 """
-    givens_qr(A; u=0.0, hessenberg=false)
+    givens_qr(A)
 
 Devuelve las matrices Q y R tales que A ≈ QR usando rotaciones de Givens.
 Puede aplicar un desplazamiento o una reducción previa a forma de Hessenberg.
 """
-function givens_qr(A; reduce_hessenberg=false, shift=false)
-	u = 0.0
-    if reduce_hessenberg
-        A = copy(hessenberg(A).H)   # F.Q no se usa aquí, solo la matriz reducida
-	else
-		A = copy(A)  # Trabajamos sobre copia
+function givens_qr(A)
+    A = copy(A)
+    m, n = size(A)
+    Q_matrix = Matrix{eltype(A)}(I, m, m)
+
+	for j in 1:n
+		for i in m:-1:(j+1)
+			a, b = A[i-1, j], A[i, j]
+			c, s = compute_givens(a, b)
+			rotate_rows!(A, i, c, s, j:n)
+			accumulate_q!(Q_matrix, i, c, s)
+		end
 	end
 
+    return Q_matrix, triu(A)
+end
+
+# ╔═╡ 3ec8c3f8-3e06-4429-98f0-a0a6c3ae30a6
+"""
+    givens_qr_with_hessenberg(A; shift=0.0)
+
+Devuelve las matrices Q y R tales que A ≈ QR usando rotaciones de Givens y una reducción previa a forma de Hessenberg. Puede aplicar un desplazamiento estático.
+"""
+function givens_qr_with_hessenberg(A; shift=0.0)
+    A = Matrix(hessenberg(A).H)
     m, n = size(A)
     Q_matrix = Matrix{eltype(A)}(I, m, m)
 
     if shift == true
-		u = A[n,n]
-        apply_shift!(A, u)
+        apply_shift!(A, shift)
     end
-
-    for j in 1:n
-        for i in m:-1:(j+1)
-            a, b = A[i-1, j], A[i, j]
-            c, s = compute_givens(a, b)
-            rotate_rows!(A, i, c, s, j:n)
-            accumulate_q!(Q_matrix, i, c, s)
-        end
-    end
+	
+	for j in 1:n-1
+		i = j + 1
+		a, b = A[i-1, j], A[i, j]
+		c, s = compute_givens(a, b)
+		rotate_rows!(A, i, c, s, j:n)
+		accumulate_q!(Q_matrix, i, c, s)
+	end
 
     if shift == true
-        apply_shift!(A, -u)
+        apply_shift!(A, -shift)
     end
 
     return Q_matrix, triu(A)
 end
 
-# ╔═╡ d84e9b74-104b-43c1-ba8f-63daa37fa09c
-md" #### Algoritmo optimizado"
+# ╔═╡ ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
+md"#### Algoritmo QR para encontrar los autovalores"
+
+# ╔═╡ 878f2368-ad72-4658-88e9-f8f289737987
+function qr_algorithm(A; pre_hessenberg=false, shift=0.0 ,tol=1e-10, maxiter=1000, verbose=false)
+    n = size(A, 1)
+	iteration = 0
+
+	if pre_hessenberg
+		Ak = Matrix(hessenberg(A).H)
+	else
+		Ak = copy(A)
+	end
+
+	if pre_hessenberg && shift!=0.0
+		apply_shift!(Ak, shift)
+	end
+	
+    for k in 1:maxiter
+        Q, R = givens_qr(Ak)
+        Ak = R * Q 
+
+        # Criterio de parada: norma de subdiagonal
+        subdiag = [Ak[i+1, i] for i in 1:n-1]
+		
+        verbose && println("Iteración $k, ||subdiag|| = ", norm(subdiag))
+        
+		if norm(subdiag) < tol 
+			iteration++
+			break
+		end
+
+    end
+
+	if pre_hessenberg && shift!=0.0
+		apply_shift!(Ak, -shift)
+	end
+	
+    return (Ak=Ak, iteration=iteration, maxiter=maxiter==iteration)  # matriz casi triangular superior
+end
+
 
 # ╔═╡ be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
-md" #### Example"
+md" #### Ejemplo"
 
 # ╔═╡ 03b315ab-f03a-4749-93d7-b63a17ac4a28
 begin
 	
-	A = randn(5, 5)           # matriz rectangular (m > n)
-	Q, R = givens_qr(A, reduce_hessenberg=true)
+	A = randn(10, 10)           # matriz rectangular (m > n)
+	Q, R = givens_qr_with_hessenberg(A, shift=true)
 	A_recon = Q * R
 	
 	@show norm(A - A_recon)         # debe ser ≈ 1e-13 o menos
@@ -205,52 +251,103 @@ begin
 	
 end
 
-# ╔═╡ 17e34d57-a674-407b-bccc-4d9d04287731
-R
+# ╔═╡ 22d3f48d-c073-423e-b76b-2724f6ea277d
+A
 
-# ╔═╡ c7e8f41a-f2d0-4fc6-a68e-62a2dec1bb28
-Q
+# ╔═╡ 53b315a0-3224-4d8b-b9c1-24095362967e
+display(eigvals(A))
+
+# ╔═╡ e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
+qr_algorithm(A, verbose=true)
+
+# ╔═╡ cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
+qr_algorithm(A, verbose=true, pre_hessenberg=true)
 
 # ╔═╡ e92c3854-12ad-4ea9-b07b-9f28f549a38d
 md"
-### Comparación de tiempo
+### Experimentos
 
 "
 
 # ╔═╡ d2390c89-50e9-4d78-8d46-72e05529f61a
-function benchmark_givens_methods(ns)
-    times_givens_no_shift = Float64[]
-    times_givens_with_hessenberg = Float64[]
-    times_givens_with_hessenberg_and_shift = Float64[]
+function plot_method_tuple(namedtuple)
+	plot!(
+		namedtuple[:ns], 
+		namedtuple[:times],
+		marker=:+,
+		label=namedtuple[:name]
+	)
 
-    for n in ns
-		A = randn(n, n)
-
-        push!(times_givens_no_shift, 
-			@belapsed givens_qr($A)
-		)
-        push!(times_givens_with_hessenberg, 
-			@belapsed givens_qr($A, reduce_hessenberg=true)
-		)
-		push!(times_givens_with_hessenberg_and_shift, 
-			@belapsed givens_qr($A, reduce_hessenberg=true, shift=true)
-		)
-    end
-
-    return times_givens_no_shift, times_givens_with_hessenberg, times_givens_with_hessenberg_and_shift
 end
 
 # ╔═╡ 7054e57e-159d-43a4-a01b-ac5a496dec6e
-ns = 10:250:1010  # Tamaños de matrices
+#ns = 10:250:1010  # Tamaños de matrices
 
-# ╔═╡ 89e2e7bb-e058-4ed8-955c-8fb5994ad799
-times = benchmark_givens_methods(ns)
+# ╔═╡ ced9f61d-36b1-4695-a198-323ea0df572a
+md"### Comparación de tiempo con/sin Hessenberg"
 
-# ╔═╡ cb0476d7-3ace-4d0e-8df5-d9f0ddd8172f
+# ╔═╡ 101b50dd-5bdb-4001-9f61-b1ed7b62df01
+function benchmark_method(f, ns; name="método", argfun=n -> randn(n, n))
+    times = Float64[]
+    
+    for n in ns
+        A = argfun(n)
+        time = @belapsed $f($A)
+        push!(times, time)
+    end
+
+    return (name=name, ns=collect(ns), times=times)
+end
+
+# ╔═╡ 246af187-a4d4-4dfb-b106-c22470301011
+times_qr = benchmark_method(givens_qr, ns, name = "Básico")
+
+# ╔═╡ fadbf5e2-c176-4fdf-9a18-eae1b2caa0ab
+times_qr_with_hessenberg = benchmark_method(givens_qr_with_hessenberg, ns, name = "con Hessenberg sin shift")
+
+# ╔═╡ 5bca0db2-aa0a-4e5a-a432-b6744cfec9d2
 begin
-	plot(ns,times[1], marker=:+, label="Basic")
-	plot!(ns,times[2], marker=:+, label="With Hessennberg")
-	plot!(ns, times[3], marker=:+, label="With Hessennberg and shift")
+	plot()
+	plot_method_tuple(times_qr)
+	plot_method_tuple(times_qr_with_hessenberg)
+	xlabel!("Tamaño de la matrix cuadrada")
+	ylabel!("Tiempo (s)")
+	title!("Comparación de tiempo")
+
+end
+
+# ╔═╡ a3e01df7-0b84-4b47-a4b4-cbc45ead115c
+md" ## Sensibilidad al valor de desplazamiento"
+
+# ╔═╡ f681dcdb-6497-4b59-b05a-cef5f3470eef
+function h_nn(A)
+	return A[end][end]
+end
+
+# ╔═╡ b6e0f49c-a09f-4424-9170-009ccc40a1ba
+function spectral_mean(A)
+	return tr(A)/size(A)[1]
+end
+
+# ╔═╡ b4bcf069-b106-4119-8899-3e5c9b2d7fe3
+times_qr_with_hnn_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=h_nn(A)), ns)
+
+# ╔═╡ 048d26ae-9643-4ac7-aaf2-6727bc84a799
+times_qr_with_spectral_mean_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=spectral_mean(A)), ns)
+
+# ╔═╡ cacb0962-800e-4dcc-95cd-3f0fd712306a
+times_qr_with_eigen_value_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=eigvals(A)[1]), ns)
+
+# ╔═╡ 1e4bc750-4c6e-48e5-8e11-e84de5c3a3ad
+times_qr_with_eigen_value2_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=eigvals(A)[2]), ns)
+
+# ╔═╡ e10fb95d-eb6e-41f4-9318-408a6f6276b1
+begin
+	plot()
+	plot_method_tuple(times_qr_with_hnn_shift)
+	plot_method_tuple(times_qr_with_spectral_mean_shift)
+	plot_method_tuple(times_qr_with_eigen_value_shift)
+	plot_method_tuple(times_qr_with_eigen_value2_shift)
 	
 	xlabel!("Tamaño de la matrix cuadrada")
 	ylabel!("Tiempo (s)")
@@ -259,7 +356,25 @@ begin
 end
 
 # ╔═╡ 1b110c4f-ee01-4328-afba-85f3a8b41f96
+md" ## Estabilidad numérica?
+debe ser lo mismo... pk se trata de misma manera
+"
 
+# ╔═╡ 30cc95d3-239c-436a-ac63-5aca42960cc3
+md" ## Precisión de los autovalores obtenidos"
+
+# ╔═╡ 36527190-6dd4-4a66-8df9-ac977e41d454
+md"
+ToDo:
+- Add names
+- Expand ns
+
+Experimentos:
+- Comparar el tiempo de ejecución (Hessenberg vs normal)
+- Sensibilidad al valor del shift (autovalor, cercano a autovalor, media espectral, lejano): Número de iteraciones para que $h_{n,n+1}$
+- Tasa de convergencia (Hessenberg vs shift): Evolución del error $h_{n,n-1}<10^{-12}$
+
+"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1393,23 +1508,40 @@ version = "1.4.1+2"
 # ╠═b0581d93-b1b9-41e2-9e2f-fede19457913
 # ╠═1b901f7e-934b-4044-9514-687914d1bde4
 # ╠═185f632d-3fb4-4a3d-adf7-ce6958c9c96e
-# ╟─7c313dea-4379-44d9-bf91-91bfc21db53d
+# ╠═7c313dea-4379-44d9-bf91-91bfc21db53d
 # ╠═cacc4b88-6533-4f42-a9cd-f55bce2331ec
 # ╠═4aa7503f-fe36-490c-97bd-57bf7fa14ae2
 # ╠═e1f0ae1e-0703-461c-b82b-f97ed64f347c
 # ╠═ad0522e5-eaab-4042-9811-34d012b5172d
 # ╠═5afdb1df-663c-4264-8d72-038664900424
 # ╠═a221ebbc-1836-4954-9d45-21f1bdece6dd
-# ╠═d84e9b74-104b-43c1-ba8f-63daa37fa09c
+# ╠═3ec8c3f8-3e06-4429-98f0-a0a6c3ae30a6
+# ╠═ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
+# ╠═878f2368-ad72-4658-88e9-f8f289737987
 # ╠═be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
+# ╠═22d3f48d-c073-423e-b76b-2724f6ea277d
 # ╠═03b315ab-f03a-4749-93d7-b63a17ac4a28
-# ╠═17e34d57-a674-407b-bccc-4d9d04287731
-# ╠═c7e8f41a-f2d0-4fc6-a68e-62a2dec1bb28
+# ╠═53b315a0-3224-4d8b-b9c1-24095362967e
+# ╠═e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
+# ╠═cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
 # ╠═e92c3854-12ad-4ea9-b07b-9f28f549a38d
 # ╠═d2390c89-50e9-4d78-8d46-72e05529f61a
-# ╠═89e2e7bb-e058-4ed8-955c-8fb5994ad799
-# ╠═cb0476d7-3ace-4d0e-8df5-d9f0ddd8172f
 # ╠═7054e57e-159d-43a4-a01b-ac5a496dec6e
+# ╠═ced9f61d-36b1-4695-a198-323ea0df572a
+# ╠═101b50dd-5bdb-4001-9f61-b1ed7b62df01
+# ╠═246af187-a4d4-4dfb-b106-c22470301011
+# ╠═fadbf5e2-c176-4fdf-9a18-eae1b2caa0ab
+# ╠═5bca0db2-aa0a-4e5a-a432-b6744cfec9d2
+# ╠═a3e01df7-0b84-4b47-a4b4-cbc45ead115c
+# ╠═f681dcdb-6497-4b59-b05a-cef5f3470eef
+# ╠═b6e0f49c-a09f-4424-9170-009ccc40a1ba
+# ╠═b4bcf069-b106-4119-8899-3e5c9b2d7fe3
+# ╠═048d26ae-9643-4ac7-aaf2-6727bc84a799
+# ╠═cacb0962-800e-4dcc-95cd-3f0fd712306a
+# ╠═1e4bc750-4c6e-48e5-8e11-e84de5c3a3ad
+# ╠═e10fb95d-eb6e-41f4-9318-408a6f6276b1
 # ╠═1b110c4f-ee01-4328-afba-85f3a8b41f96
+# ╠═30cc95d3-239c-436a-ac63-5aca42960cc3
+# ╠═36527190-6dd4-4a66-8df9-ac977e41d454
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
