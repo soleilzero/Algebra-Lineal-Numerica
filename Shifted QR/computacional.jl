@@ -134,6 +134,13 @@ function accumulate_q!(Q, i, c, s)
     end
 end
 
+# ╔═╡ 02f8eba5-09d5-4ff0-ac76-dff1e6b1152d
+function subdiagonal_norm(A::AbstractMatrix)
+    n = size(A, 1)
+    return norm([A[i+1, i] for i in 1:n-1])
+end
+
+
 # ╔═╡ 5afdb1df-663c-4264-8d72-038664900424
 md"
 ### Funciones para la descomposición QR
@@ -225,10 +232,10 @@ function qr_algorithm_with_dynamic_shift(A; shift_method, tol=1e-5, maxiter=1000
 
 
         # Criterio de parada
-        subdiag = [Ak[i+1, i] for i in 1:n-1]
-        verbose && println("Iteración $k, ||subdiag|| = ", norm(subdiag))
+        subdiag_norm = subdiagonal_norm(Ak)
+        verbose && println("Iteración $k, ||subdiag|| = ", subdiag_norm)
 
-        if norm(subdiag) < tol
+        if subdiag_norm < tol
             iteration = k
             break
         end
@@ -252,25 +259,40 @@ spectral_mean(A) = tr(A) / size(A, 1)
 md" #### Ejemplo"
 
 # ╔═╡ 22d3f48d-c073-423e-b76b-2724f6ea277d
+# ╠═╡ disabled = true
+#=╠═╡
 A = randn(10, 10)
+  ╠═╡ =#
 
 # ╔═╡ 121d2749-18d1-4c4f-a67c-aaf0d51d4aef
+#=╠═╡
 Matrix(hessenberg(A).H)
+  ╠═╡ =#
 
 # ╔═╡ 53b315a0-3224-4d8b-b9c1-24095362967e
+#=╠═╡
 display(eigvals(A))
+  ╠═╡ =#
 
 # ╔═╡ e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
+#=╠═╡
 qr_algorithm(A, verbose=true)
+  ╠═╡ =#
 
 # ╔═╡ cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
+#=╠═╡
 qr_algorithm(A, verbose=true, pre_hessenberg=true)
+  ╠═╡ =#
 
 # ╔═╡ 1247d99e-4f28-4d86-aa73-46f49733551d
+#=╠═╡
 qr_algorithm_with_dynamic_shift(A, shift_method=h_nn, verbose=true)
+  ╠═╡ =#
 
 # ╔═╡ 6c7ad571-24ec-47c9-b4e1-bde96a13e20f
+#=╠═╡
 qr_algorithm_with_dynamic_shift(A, shift_method=spectral_mean, verbose=true)
+  ╠═╡ =#
 
 # ╔═╡ e92c3854-12ad-4ea9-b07b-9f28f549a38d
 md"
@@ -331,25 +353,40 @@ function compare_qr_algorithms(ns; samples=3, maxiter=1000, matrix_generator=gen
 end
 
 
-# ╔═╡ 442858ad-85c0-42c1-9088-5beb86586b80
-begin
-	ns = 10:5:20  # Tamaños de matrices
-	simetric_experiment = compare_qr_algorithms(ns, samples=3, maxiter=10000)
+# ╔═╡ be025423-7a8f-4920-8461-03e1e8feda9a
+function plot_experiment(experiment, func; ylabel="", title="", xlabel="Tamaño de la matriz", markers=true)
+    plot(title=title, xlabel=xlabel, ylabel=ylabel)
+
+    for (name, data) in pairs(experiment)
+        (name == :sizes || name == :original_matrix) && continue
+
+        y = func(data, experiment.original_matrix)
+        plot!(
+            experiment.sizes,
+            y,
+            label = string(name),
+            marker =:+
+        )
+    end
+	plot!()
 end
 
-# ╔═╡ a1137d84-35c3-4ec2-98b2-7284b67e3897
+
+# ╔═╡ aed1d4f5-27e7-41f6-96d2-7ca456b6a43a
 md"
-#### Convergencia
-Visualisemos la convergencia o falta de ella de los diferentes métodos para numerosas matrices
+Ejecutamos un experimento que ejecuta los diferentes algoritmos en 5 matrices simétricas de cada tamaño.
+
+A partir de los resultados del experimento. Para cada tamaño vamos a graficar:
+ * el número de iteraciones promedio,
+ * la norma de la subdiagonal final,
+ * error.
 "
 
-# ╔═╡ 10878762-1392-4762-8572-0a66feca2435
-md"
-A partir de los resultados del experimento. Para cada tamaño vamos a graficar:
- * el número de iteraciones promedio
- * la norma de la subdiagonal final
- * error espectral
-"
+# ╔═╡ 442858ad-85c0-42c1-9088-5beb86586b80
+begin
+	ns = 10:10:50  # Tamaños de matrices
+	simetric_experiment = compare_qr_algorithms(ns, samples=5, maxiter=10000)
+end
 
 # ╔═╡ d07ebc60-61f4-4453-a230-bebea063dd12
 function mean_per_size(result_matrix::Matrix{<:NamedTuple}, field::Symbol)
@@ -361,56 +398,102 @@ function mean_per_size(result_matrix::Matrix{<:NamedTuple}, field::Symbol)
 end
 
 
-# ╔═╡ ae6bbe94-6b88-4af7-bf23-9cd731acde5f
-begin
-	# Graficar
-	plot(marker=:+)
-	plot!(ns, mean_per_size(simetric_experiment.no_shift, :iteration))
-	plot!(ns, mean_per_size(simetric_experiment.hessenberg, :iteration), label="QR con Hessenberg")
-	
-end
-
 # ╔═╡ f2ce2b3f-600b-4601-9a8c-314168e7f9ab
-for (name, data) in pairs(simetric_experiment)
-    (name == :sizes || name == :A) && continue  # skip the size field
-	
-    plot!(
-        simetric_experiment.sizes,
-        mean_per_size(data, :iteration),
-        label = string(name)
-    )
-end
-
-
-# ╔═╡ 9187d446-e2e8-4912-b7fe-fe7bea8a7da9
 begin
-	# Graficar
-	plot(ns, sin, label="QR sin Hessenberg", lw=2, marker=:circle)
-	plot!(ns, hess, label="QR con Hessenberg", lw=2, marker=:square)
-	plot!(ns, hnn, label="QR con shift h_nn", lw=2, marker=:utriangle)
-	plot!(ns, media, label="QR con shift media espectral", lw=2, marker=:diamond)
+	plot()
+	for (name, data) in pairs(simetric_experiment)
+		# skip non-result fields
+	    (name == :sizes || name == :original_matrix) && continue
+
+	    plot!(
+	        simetric_experiment.sizes,
+	        mean_per_size(data, :iteration),
+	        label = string(name)
+	    )
+	end
+	plot!()
 	xlabel!("Tamaño de la matriz (n)")
 	ylabel!("Iteraciones hasta convergencia")
-	title!("Número de iteraciones en matrices simétricas")
+	title!("Iteraciones promedio en matrices simétricas")
 	#grid!(true)
-	
 end
 
+# ╔═╡ 22ba3cac-a798-47ed-81de-ef59627e92e2
+begin
+	mean_iterations_per_size(result_matrix, _) = mean_per_size(result_matrix, :iteration)
+
+plot_experiment(
+    simetric_experiment,
+    mean_iterations_per_size,
+    ylabel = "Número de iteraciones",
+    title = "Iteraciones usadas por cada método"
+)
+end
+
+# ╔═╡ f77f3bd6-33b9-4e2e-a0fc-fb366314781c
+function mean_subdiagonal_norm_per_size(result_matrix)
+    return [
+        mean(subdiagonal_norm(r.Ak) for r in result_matrix[i, :])
+        for i in 1:size(result_matrix, 1)
+    ]
+end
+
+
 # ╔═╡ 35cf02eb-3a1d-4593-abad-f7d8e1a48e14
+begin
+	plot()
+	for (name, data) in pairs(simetric_experiment)
+		# skip non-result fields
+	    (name == :sizes || name == :original_matrix) && continue
+		plot!(
+	        simetric_experiment.sizes,
+	        mean_subdiagonal_norm_per_size(data),
+	        label = string(name)
+	    )
+	end
+	plot!()
+	xlabel!("Tamaño de la matriz (n)")
+	ylabel!("Norma de la subdiagonal al final del algoritmo")
+	title!("Norma promedio en matrices simétricas")
+	#grid!(true)
+end
+
+# ╔═╡ 49047a73-728f-4105-b9e1-8245487289e0
+function spectral_error(result::NamedTuple, A::AbstractMatrix)
+    λ_approx = sort(eigvals(result.Ak))
+    λ_exact  = sort(eigvals(A))
+    return norm(λ_approx - λ_exact)
+end
+
+
+# ╔═╡ 6dc1d2b1-1095-4d3d-ab94-258d398e3e9c
+function mean_spectral_error_per_size(result_matrix, original_matrix)
+    n_rows = size(result_matrix, 1)
+    return [
+        mean(spectral_error(result_matrix[i, j], original_matrix[i, j]) for j in 1:size(result_matrix, 2))
+        for i in 1:n_rows
+    ]
+end
 
 
 # ╔═╡ 27840aa5-4671-4ce6-87b4-82de3d6b3f75
+begin
+	plot()	
+	for (name, data) in pairs(simetric_experiment)
+		# skip non-result fields
+	    (name == :sizes || name == :original_matrix) && continue
 
-
-# ╔═╡ d2390c89-50e9-4d78-8d46-72e05529f61a
-function plot_method_tuple(namedtuple)
-	plot!(
-		namedtuple[:ns], 
-		namedtuple[:times],
-		marker=:+,
-		label=namedtuple[:name]
-	)
-
+		plot!(
+	        simetric_experiment.sizes,
+			mean_spectral_error_per_size(data, simetric_experiment.original_matrix),
+	        label = string(name)
+	    )
+	end
+	plot!()
+	xlabel!("Tamaño de la matriz (n)")
+	ylabel!("Error")
+	title!("Error promedio en matrices simétricas")
+	#grid!(true)
 end
 
 # ╔═╡ 7054e57e-159d-43a4-a01b-ac5a496dec6e
@@ -432,51 +515,8 @@ function benchmark_method(f, ns; name="método", argfun=n -> randn(n, n))
     return (name=name, ns=collect(ns), times=times)
 end
 
-# ╔═╡ 246af187-a4d4-4dfb-b106-c22470301011
-times_qr = benchmark_method(givens_qr, ns1, name = "Básico")
-
-# ╔═╡ fadbf5e2-c176-4fdf-9a18-eae1b2caa0ab
-times_qr_with_hessenberg = benchmark_method(givens_qr_with_hessenberg, ns1, name = "con Hessenberg sin shift")
-
-# ╔═╡ 5bca0db2-aa0a-4e5a-a432-b6744cfec9d2
-begin
-	plot()
-	plot_method_tuple(times_qr)
-	plot_method_tuple(times_qr_with_hessenberg)
-	xlabel!("Tamaño de la matrix cuadrada")
-	ylabel!("Tiempo (s)")
-	title!("Comparación de tiempo")
-
-end
-
 # ╔═╡ a3e01df7-0b84-4b47-a4b4-cbc45ead115c
 md" ## Sensibilidad al valor de desplazamiento"
-
-# ╔═╡ b4bcf069-b106-4119-8899-3e5c9b2d7fe3
-times_qr_with_hnn_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=h_nn(A)), ns)
-
-# ╔═╡ 048d26ae-9643-4ac7-aaf2-6727bc84a799
-times_qr_with_spectral_mean_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=spectral_mean(A)), ns)
-
-# ╔═╡ cacb0962-800e-4dcc-95cd-3f0fd712306a
-times_qr_with_eigen_value_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=eigvals(A)[1]), ns)
-
-# ╔═╡ 1e4bc750-4c6e-48e5-8e11-e84de5c3a3ad
-times_qr_with_eigen_value2_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=eigvals(A)[2]), ns)
-
-# ╔═╡ e10fb95d-eb6e-41f4-9318-408a6f6276b1
-begin
-	plot()
-	plot_method_tuple(times_qr_with_hnn_shift)
-	plot_method_tuple(times_qr_with_spectral_mean_shift)
-	plot_method_tuple(times_qr_with_eigen_value_shift)
-	plot_method_tuple(times_qr_with_eigen_value2_shift)
-	
-	xlabel!("Tamaño de la matrix cuadrada")
-	ylabel!("Tiempo (s)")
-	title!("Comparación de tiempo")
-
-end
 
 # ╔═╡ 30cc95d3-239c-436a-ac63-5aca42960cc3
 md" 
@@ -490,7 +530,9 @@ ToDo:
 - Expand ns
 
 Experimentos:
-- Comparar el tiempo de ejecución (Hessenberg vs normal)
+- Número de iteraciones (convergencia)  |  numero de copias = 5, cambiar nombres
+
+
 - Sensibilidad al valor del shift (autovalor, cercano a autovalor, media espectral, lejano): Número de iteraciones para que $h_{n,n+1}$
 - Tasa de convergencia (Hessenberg vs shift): Evolución del error $h_{n,n-1}<10^{-12}$
 
@@ -1633,6 +1675,7 @@ version = "1.4.1+2"
 # ╠═4aa7503f-fe36-490c-97bd-57bf7fa14ae2
 # ╠═e1f0ae1e-0703-461c-b82b-f97ed64f347c
 # ╠═ad0522e5-eaab-4042-9811-34d012b5172d
+# ╠═02f8eba5-09d5-4ff0-ac76-dff1e6b1152d
 # ╠═5afdb1df-663c-4264-8d72-038664900424
 # ╠═a221ebbc-1836-4954-9d45-21f1bdece6dd
 # ╠═ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
@@ -1651,28 +1694,21 @@ version = "1.4.1+2"
 # ╠═e92c3854-12ad-4ea9-b07b-9f28f549a38d
 # ╠═092ceef9-93a1-444c-a535-68d6020d80cc
 # ╠═8d9afd5b-309a-4ef3-ae31-13b3f2258e15
+# ╠═be025423-7a8f-4920-8461-03e1e8feda9a
+# ╠═aed1d4f5-27e7-41f6-96d2-7ca456b6a43a
 # ╠═442858ad-85c0-42c1-9088-5beb86586b80
-# ╠═a1137d84-35c3-4ec2-98b2-7284b67e3897
-# ╠═10878762-1392-4762-8572-0a66feca2435
 # ╠═d07ebc60-61f4-4453-a230-bebea063dd12
-# ╠═ae6bbe94-6b88-4af7-bf23-9cd731acde5f
 # ╠═f2ce2b3f-600b-4601-9a8c-314168e7f9ab
-# ╠═9187d446-e2e8-4912-b7fe-fe7bea8a7da9
+# ╠═22ba3cac-a798-47ed-81de-ef59627e92e2
+# ╠═f77f3bd6-33b9-4e2e-a0fc-fb366314781c
 # ╠═35cf02eb-3a1d-4593-abad-f7d8e1a48e14
+# ╠═49047a73-728f-4105-b9e1-8245487289e0
+# ╠═6dc1d2b1-1095-4d3d-ab94-258d398e3e9c
 # ╠═27840aa5-4671-4ce6-87b4-82de3d6b3f75
-# ╠═d2390c89-50e9-4d78-8d46-72e05529f61a
 # ╠═7054e57e-159d-43a4-a01b-ac5a496dec6e
 # ╠═ced9f61d-36b1-4695-a198-323ea0df572a
 # ╠═101b50dd-5bdb-4001-9f61-b1ed7b62df01
-# ╠═246af187-a4d4-4dfb-b106-c22470301011
-# ╠═fadbf5e2-c176-4fdf-9a18-eae1b2caa0ab
-# ╠═5bca0db2-aa0a-4e5a-a432-b6744cfec9d2
 # ╠═a3e01df7-0b84-4b47-a4b4-cbc45ead115c
-# ╠═b4bcf069-b106-4119-8899-3e5c9b2d7fe3
-# ╠═048d26ae-9643-4ac7-aaf2-6727bc84a799
-# ╠═cacb0962-800e-4dcc-95cd-3f0fd712306a
-# ╠═1e4bc750-4c6e-48e5-8e11-e84de5c3a3ad
-# ╠═e10fb95d-eb6e-41f4-9318-408a6f6276b1
 # ╠═30cc95d3-239c-436a-ac63-5aca42960cc3
 # ╠═36527190-6dd4-4a66-8df9-ac977e41d454
 # ╟─00000000-0000-0000-0000-000000000001
