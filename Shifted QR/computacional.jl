@@ -163,96 +163,99 @@ function givens_qr(A)
     return Q_matrix, triu(A)
 end
 
-# ╔═╡ 3ec8c3f8-3e06-4429-98f0-a0a6c3ae30a6
-"""
-    givens_qr_with_hessenberg(A; shift=0.0)
-
-Devuelve las matrices Q y R tales que A ≈ QR usando rotaciones de Givens y una reducción previa a forma de Hessenberg. Puede aplicar un desplazamiento estático.
-"""
-function givens_qr_with_hessenberg(A; shift=0.0)
-    A = Matrix(hessenberg(A).H)
-    m, n = size(A)
-    Q_matrix = Matrix{eltype(A)}(I, m, m)
-
-    if shift == true
-        apply_shift!(A, shift)
-    end
-	
-	for j in 1:n-1
-		i = j + 1
-		a, b = A[i-1, j], A[i, j]
-		c, s = compute_givens(a, b)
-		rotate_rows!(A, i, c, s, j:n)
-		accumulate_q!(Q_matrix, i, c, s)
-	end
-
-    if shift == true
-        apply_shift!(A, -shift)
-    end
-
-    return Q_matrix, triu(A)
-end
-
 # ╔═╡ ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
-md"#### Algoritmo QR para encontrar los autovalores"
+md"#### Algoritmo QR"
 
-# ╔═╡ 878f2368-ad72-4658-88e9-f8f289737987
-function qr_algorithm(A; pre_hessenberg=false, shift=0.0 ,tol=1e-10, maxiter=1000, verbose=false)
+# ╔═╡ 16fc77f2-f355-4f45-bd38-26eb2433d8bc
+function qr_algorithm(A; pre_hessenberg=false, shift=0.0, tol=1e-10, maxiter=1000, verbose=false)
     n = size(A, 1)
-	iteration = 0
+    iteration = 0
+	Id = Matrix{eltype(A)}(I, size(A)...)
 
-	if pre_hessenberg
-		Ak = Matrix(hessenberg(A).H)
-	else
-		Ak = copy(A)
-	end
+    # Paso 0: Reducción a forma de Hessenberg si se solicita
+    Ak = pre_hessenberg ? Matrix(hessenberg(A).H) : copy(A)
 
-	if pre_hessenberg && shift!=0.0
-		apply_shift!(Ak, shift)
-	end
-	
+    # Aplicar shift inicial si corresponde
+    if pre_hessenberg && shift != 0.0
+        apply_shift!(Ak, shift)
+    end
+
+    # Iteraciones QR
     for k in 1:maxiter
         Q, R = givens_qr(Ak)
-        Ak = R * Q 
+        Ak = R * Q
 
-        # Criterio de parada: norma de subdiagonal
         subdiag = [Ak[i+1, i] for i in 1:n-1]
-		
         verbose && println("Iteración $k, ||subdiag|| = ", norm(subdiag))
-        
-		if norm(subdiag) < tol 
-			iteration++
-			break
-		end
 
+        if norm(subdiag) < tol
+            iteration = k
+            break
+        end
     end
 
-	if pre_hessenberg && shift!=0.0
-		apply_shift!(Ak, -shift)
-	end
-	
-    return (Ak=Ak, iteration=iteration, maxiter=maxiter==iteration)  # matriz casi triangular superior
+    # Verificación si no se alcanzó la convergencia
+    max_iter_reached = (iteration == 0)
+
+    # Deshacer shift si fue aplicado
+    if pre_hessenberg && shift != 0.0
+        apply_shift!(Ak, -shift)
+    end
+
+    return (Ak=Ak, iteration=max_iter_reached ? maxiter : iteration, max_iter_reached)
 end
 
+
+# ╔═╡ a04604ea-e7ca-458d-a722-cfcf4439dbd8
+function qr_algorithm_with_dynamic_shift(A; shift_method, tol=1e-5, maxiter=1000, verbose=false)
+    n = size(A, 1)
+    iteration = 0
+	
+	Id = Matrix{eltype(A)}(I, size(A)...)
+	
+    # Paso 0: reducción a forma de Hessenberg (requerido)
+    Ak = Matrix(hessenberg(A).H)
+
+    for k in 1:maxiter
+        u = shift_method(Ak)
+
+        # Paso QR con shift: A - uI = QR ⇒ A⁺ = RQ + μI
+		Q, R = givens_qr(Ak .- u * Id)
+		Ak = R * Q .+ u * Id
+
+
+        # Criterio de parada
+        subdiag = [Ak[i+1, i] for i in 1:n-1]
+        verbose && println("Iteración $k, ||subdiag|| = ", norm(subdiag))
+
+        if norm(subdiag) < tol
+            iteration = k
+            break
+        end
+    end
+
+    max_iter_reached = (iteration == 0)
+    return (Ak=Ak, iteration=max_iter_reached ? maxiter : iteration, max_iter_reached)
+end
+
+
+# ╔═╡ ddeb09df-1fd8-4360-baf3-b9cd12ac6305
+# Funciones auxiliares de shift
+h_nn(A) = A[end, end]
+
+# ╔═╡ 284f0bb6-2e47-49b3-9b07-eb06ce014694
+spectral_mean(A) = tr(A) / size(A, 1)
+
+# Función de prueba: matriz simétrica
 
 # ╔═╡ be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
 md" #### Ejemplo"
 
-# ╔═╡ 03b315ab-f03a-4749-93d7-b63a17ac4a28
-begin
-	
-	A = randn(10, 10)           # matriz rectangular (m > n)
-	Q, R = givens_qr_with_hessenberg(A, shift=true)
-	A_recon = Q * R
-	
-	@show norm(A - A_recon)         # debe ser ≈ 1e-13 o menos
-	@show norm(Matrix{eltype(A)}(I, size(Q,2), size(Q,2)) - Q'Q)  # ortogonalidad
-	@show istriu(R)                # true
-	
-end
-
 # ╔═╡ 22d3f48d-c073-423e-b76b-2724f6ea277d
-A
+A = randn(10, 10)
+
+# ╔═╡ 121d2749-18d1-4c4f-a67c-aaf0d51d4aef
+Matrix(hessenberg(A).H)
 
 # ╔═╡ 53b315a0-3224-4d8b-b9c1-24095362967e
 display(eigvals(A))
@@ -263,11 +266,141 @@ qr_algorithm(A, verbose=true)
 # ╔═╡ cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
 qr_algorithm(A, verbose=true, pre_hessenberg=true)
 
+# ╔═╡ 1247d99e-4f28-4d86-aa73-46f49733551d
+qr_algorithm_with_dynamic_shift(A, shift_method=h_nn, verbose=true)
+
+# ╔═╡ 6c7ad571-24ec-47c9-b4e1-bde96a13e20f
+qr_algorithm_with_dynamic_shift(A, shift_method=spectral_mean, verbose=true)
+
 # ╔═╡ e92c3854-12ad-4ea9-b07b-9f28f549a38d
 md"
 ### Experimentos
 
 "
+
+# ╔═╡ 092ceef9-93a1-444c-a535-68d6020d80cc
+function generate_symmetric(n)
+    A = randn(n, n)
+    return A + A'
+end
+
+# Comparador de algoritmos
+
+# ╔═╡ 8d9afd5b-309a-4ef3-ae31-13b3f2258e15
+function compare_qr_algorithms(ns; samples=3, maxiter=1000, matrix_generator=generate_symmetric)
+    n_sizes = length(ns)
+
+    # Initialize result storage: one matrix per method
+    results = (
+		sizes = ns,
+		original_matrix = Matrix{Any}(undef, n_sizes, samples),
+        no_shift = Matrix{NamedTuple}(undef, n_sizes, samples),
+        hessenberg = Matrix{NamedTuple}(undef, n_sizes, samples),
+        shift_static = Matrix{NamedTuple}(undef, n_sizes, samples),
+        shift_hnn = Matrix{NamedTuple}(undef, n_sizes, samples),
+        shift_mean = Matrix{NamedTuple}(undef, n_sizes, samples),
+    )
+
+    for (i, n) in enumerate(ns)
+        for j in 1:samples
+            A = matrix_generator(n)
+
+			results.original_matrix[i,j] = A
+
+            results.no_shift[i, j] = qr_algorithm(A, verbose=false, maxiter=maxiter)
+
+            results.hessenberg[i, j] = qr_algorithm(
+                A, verbose=false, pre_hessenberg=true, maxiter=maxiter
+            )
+			
+            results.shift_static[i, j] = qr_algorithm(
+                A, verbose=false, pre_hessenberg=true, shift=h_nn(A), maxiter=maxiter
+            )
+			
+            results.shift_hnn[i, j] = qr_algorithm_with_dynamic_shift(
+                A, shift_method=h_nn, verbose=false, maxiter=maxiter
+            )
+
+            results.shift_mean[i, j] = qr_algorithm_with_dynamic_shift(
+                A, shift_method=spectral_mean, verbose=false, maxiter=maxiter
+            )
+        end
+    end
+
+    return results
+end
+
+
+# ╔═╡ 442858ad-85c0-42c1-9088-5beb86586b80
+begin
+	ns = 10:5:20  # Tamaños de matrices
+	simetric_experiment = compare_qr_algorithms(ns, samples=3, maxiter=10000)
+end
+
+# ╔═╡ a1137d84-35c3-4ec2-98b2-7284b67e3897
+md"
+#### Convergencia
+Visualisemos la convergencia o falta de ella de los diferentes métodos para numerosas matrices
+"
+
+# ╔═╡ 10878762-1392-4762-8572-0a66feca2435
+md"
+A partir de los resultados del experimento. Para cada tamaño vamos a graficar:
+ * el número de iteraciones promedio
+ * la norma de la subdiagonal final
+ * error espectral
+"
+
+# ╔═╡ d07ebc60-61f4-4453-a230-bebea063dd12
+function mean_per_size(result_matrix::Matrix{<:NamedTuple}, field::Symbol)
+    return [
+				mean(getfield(r, field) 
+				for r in result_matrix[i, :]) 
+				for i in 1:size(result_matrix, 1)
+			]
+end
+
+
+# ╔═╡ ae6bbe94-6b88-4af7-bf23-9cd731acde5f
+begin
+	# Graficar
+	plot(marker=:+)
+	plot!(ns, mean_per_size(simetric_experiment.no_shift, :iteration))
+	plot!(ns, mean_per_size(simetric_experiment.hessenberg, :iteration), label="QR con Hessenberg")
+	
+end
+
+# ╔═╡ f2ce2b3f-600b-4601-9a8c-314168e7f9ab
+for (name, data) in pairs(simetric_experiment)
+    (name == :sizes || name == :A) && continue  # skip the size field
+	
+    plot!(
+        simetric_experiment.sizes,
+        mean_per_size(data, :iteration),
+        label = string(name)
+    )
+end
+
+
+# ╔═╡ 9187d446-e2e8-4912-b7fe-fe7bea8a7da9
+begin
+	# Graficar
+	plot(ns, sin, label="QR sin Hessenberg", lw=2, marker=:circle)
+	plot!(ns, hess, label="QR con Hessenberg", lw=2, marker=:square)
+	plot!(ns, hnn, label="QR con shift h_nn", lw=2, marker=:utriangle)
+	plot!(ns, media, label="QR con shift media espectral", lw=2, marker=:diamond)
+	xlabel!("Tamaño de la matriz (n)")
+	ylabel!("Iteraciones hasta convergencia")
+	title!("Número de iteraciones en matrices simétricas")
+	#grid!(true)
+	
+end
+
+# ╔═╡ 35cf02eb-3a1d-4593-abad-f7d8e1a48e14
+
+
+# ╔═╡ 27840aa5-4671-4ce6-87b4-82de3d6b3f75
+
 
 # ╔═╡ d2390c89-50e9-4d78-8d46-72e05529f61a
 function plot_method_tuple(namedtuple)
@@ -300,10 +433,10 @@ function benchmark_method(f, ns; name="método", argfun=n -> randn(n, n))
 end
 
 # ╔═╡ 246af187-a4d4-4dfb-b106-c22470301011
-times_qr = benchmark_method(givens_qr, ns, name = "Básico")
+times_qr = benchmark_method(givens_qr, ns1, name = "Básico")
 
 # ╔═╡ fadbf5e2-c176-4fdf-9a18-eae1b2caa0ab
-times_qr_with_hessenberg = benchmark_method(givens_qr_with_hessenberg, ns, name = "con Hessenberg sin shift")
+times_qr_with_hessenberg = benchmark_method(givens_qr_with_hessenberg, ns1, name = "con Hessenberg sin shift")
 
 # ╔═╡ 5bca0db2-aa0a-4e5a-a432-b6744cfec9d2
 begin
@@ -318,16 +451,6 @@ end
 
 # ╔═╡ a3e01df7-0b84-4b47-a4b4-cbc45ead115c
 md" ## Sensibilidad al valor de desplazamiento"
-
-# ╔═╡ f681dcdb-6497-4b59-b05a-cef5f3470eef
-function h_nn(A)
-	return A[end][end]
-end
-
-# ╔═╡ b6e0f49c-a09f-4424-9170-009ccc40a1ba
-function spectral_mean(A)
-	return tr(A)/size(A)[1]
-end
 
 # ╔═╡ b4bcf069-b106-4119-8899-3e5c9b2d7fe3
 times_qr_with_hnn_shift = benchmark_method(A -> givens_qr_with_hessenberg(A, shift=h_nn(A)), ns)
@@ -355,13 +478,10 @@ begin
 
 end
 
-# ╔═╡ 1b110c4f-ee01-4328-afba-85f3a8b41f96
-md" ## Estabilidad numérica?
-debe ser lo mismo... pk se trata de misma manera
-"
-
 # ╔═╡ 30cc95d3-239c-436a-ac63-5aca42960cc3
-md" ## Precisión de los autovalores obtenidos"
+md" 
+## Estabilidad numérica?
+## Precisión de los autovalores obtenidos"
 
 # ╔═╡ 36527190-6dd4-4a66-8df9-ac977e41d454
 md"
@@ -1515,16 +1635,31 @@ version = "1.4.1+2"
 # ╠═ad0522e5-eaab-4042-9811-34d012b5172d
 # ╠═5afdb1df-663c-4264-8d72-038664900424
 # ╠═a221ebbc-1836-4954-9d45-21f1bdece6dd
-# ╠═3ec8c3f8-3e06-4429-98f0-a0a6c3ae30a6
 # ╠═ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
-# ╠═878f2368-ad72-4658-88e9-f8f289737987
+# ╠═16fc77f2-f355-4f45-bd38-26eb2433d8bc
+# ╠═a04604ea-e7ca-458d-a722-cfcf4439dbd8
+# ╠═ddeb09df-1fd8-4360-baf3-b9cd12ac6305
+# ╠═284f0bb6-2e47-49b3-9b07-eb06ce014694
 # ╠═be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
 # ╠═22d3f48d-c073-423e-b76b-2724f6ea277d
-# ╠═03b315ab-f03a-4749-93d7-b63a17ac4a28
+# ╠═121d2749-18d1-4c4f-a67c-aaf0d51d4aef
 # ╠═53b315a0-3224-4d8b-b9c1-24095362967e
 # ╠═e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
 # ╠═cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
+# ╠═1247d99e-4f28-4d86-aa73-46f49733551d
+# ╠═6c7ad571-24ec-47c9-b4e1-bde96a13e20f
 # ╠═e92c3854-12ad-4ea9-b07b-9f28f549a38d
+# ╠═092ceef9-93a1-444c-a535-68d6020d80cc
+# ╠═8d9afd5b-309a-4ef3-ae31-13b3f2258e15
+# ╠═442858ad-85c0-42c1-9088-5beb86586b80
+# ╠═a1137d84-35c3-4ec2-98b2-7284b67e3897
+# ╠═10878762-1392-4762-8572-0a66feca2435
+# ╠═d07ebc60-61f4-4453-a230-bebea063dd12
+# ╠═ae6bbe94-6b88-4af7-bf23-9cd731acde5f
+# ╠═f2ce2b3f-600b-4601-9a8c-314168e7f9ab
+# ╠═9187d446-e2e8-4912-b7fe-fe7bea8a7da9
+# ╠═35cf02eb-3a1d-4593-abad-f7d8e1a48e14
+# ╠═27840aa5-4671-4ce6-87b4-82de3d6b3f75
 # ╠═d2390c89-50e9-4d78-8d46-72e05529f61a
 # ╠═7054e57e-159d-43a4-a01b-ac5a496dec6e
 # ╠═ced9f61d-36b1-4695-a198-323ea0df572a
@@ -1533,14 +1668,11 @@ version = "1.4.1+2"
 # ╠═fadbf5e2-c176-4fdf-9a18-eae1b2caa0ab
 # ╠═5bca0db2-aa0a-4e5a-a432-b6744cfec9d2
 # ╠═a3e01df7-0b84-4b47-a4b4-cbc45ead115c
-# ╠═f681dcdb-6497-4b59-b05a-cef5f3470eef
-# ╠═b6e0f49c-a09f-4424-9170-009ccc40a1ba
 # ╠═b4bcf069-b106-4119-8899-3e5c9b2d7fe3
 # ╠═048d26ae-9643-4ac7-aaf2-6727bc84a799
 # ╠═cacb0962-800e-4dcc-95cd-3f0fd712306a
 # ╠═1e4bc750-4c6e-48e5-8e11-e84de5c3a3ad
 # ╠═e10fb95d-eb6e-41f4-9318-408a6f6276b1
-# ╠═1b110c4f-ee01-4328-afba-85f3a8b41f96
 # ╠═30cc95d3-239c-436a-ac63-5aca42960cc3
 # ╠═36527190-6dd4-4a66-8df9-ac977e41d454
 # ╟─00000000-0000-0000-0000-000000000001
