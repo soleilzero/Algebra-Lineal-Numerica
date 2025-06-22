@@ -19,9 +19,9 @@ md"
 # ╔═╡ 1b901f7e-934b-4044-9514-687914d1bde4
 md"
 ### Implementación
-#### Código original
-
-Primero, mejoramos el código de Givens trabajado en la última tarea
+#### Descomposición QR
+##### Antiguo código
+Partimos del código de Givens trabajado en la última tarea para mejorarlo:
 "
 
 # ╔═╡ 185f632d-3fb4-4a3d-adf7-ce6958c9c96e
@@ -62,10 +62,8 @@ end
 
 # ╔═╡ 7c313dea-4379-44d9-bf91-91bfc21db53d
 md"
-#### Funciones secundarias
+##### Funciones auxiliares
 Lo modularizamos para mejorar su claridad. Tenemos cuidado de tratar con `views` para no tener copias temporales.
-
-Además, añadimos la capacidad de utilizar un shift fijo.
 "
 
 # ╔═╡ cacc4b88-6533-4f42-a9cd-f55bce2331ec
@@ -143,7 +141,7 @@ end
 
 # ╔═╡ 5afdb1df-663c-4264-8d72-038664900424
 md"
-### Funciones para la descomposición QR
+##### Función principal
 "
 
 # ╔═╡ a221ebbc-1836-4954-9d45-21f1bdece6dd
@@ -171,7 +169,21 @@ function givens_qr(A)
 end
 
 # ╔═╡ ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
-md"#### Algoritmo QR"
+md"
+#### Algoritmos QR prácticos implementados
+
+Se han definido dos funciones principales para ejecutar variantes del algoritmo QR en la práctica:
+
+`qr_algorithm`:
+Esta función permite aplicar el algoritmo QR en tres modalidades, seleccionadas mediante argumentos opcionales:
+
+ * Versión básica sin preprocesamiento,
+ * Con reducción previa a forma de Hessenberg,
+ * O con shift estático aplicado a la matriz Hessenberg.
+
+`qr_algorithm_with_dynamic_shift`:
+Esta función aplica el algoritmo QR con shift dinámico, actualizado en cada iteración según una estrategia proporcionada (por ejemplo, Rayleigh o Wilkinson). La matriz se reduce previamente a forma de Hessenberg.
+"
 
 # ╔═╡ 16fc77f2-f355-4f45-bd38-26eb2433d8bc
 function qr_algorithm(A; pre_hessenberg=false, shift=0.0, tol=1e-10, maxiter=1000, verbose=false)
@@ -256,48 +268,60 @@ spectral_mean(A) = tr(A) / size(A, 1)
 # Función de prueba: matriz simétrica
 
 # ╔═╡ be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
-md" #### Ejemplo"
-
-# ╔═╡ 22d3f48d-c073-423e-b76b-2724f6ea277d
-# ╠═╡ disabled = true
-#=╠═╡
-A = randn(10, 10)
-  ╠═╡ =#
-
-# ╔═╡ 121d2749-18d1-4c4f-a67c-aaf0d51d4aef
-#=╠═╡
-Matrix(hessenberg(A).H)
-  ╠═╡ =#
-
-# ╔═╡ 53b315a0-3224-4d8b-b9c1-24095362967e
-#=╠═╡
-display(eigvals(A))
-  ╠═╡ =#
-
-# ╔═╡ e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
-#=╠═╡
-qr_algorithm(A, verbose=true)
-  ╠═╡ =#
-
-# ╔═╡ cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
-#=╠═╡
-qr_algorithm(A, verbose=true, pre_hessenberg=true)
-  ╠═╡ =#
-
-# ╔═╡ 1247d99e-4f28-4d86-aa73-46f49733551d
-#=╠═╡
-qr_algorithm_with_dynamic_shift(A, shift_method=h_nn, verbose=true)
-  ╠═╡ =#
-
-# ╔═╡ 6c7ad571-24ec-47c9-b4e1-bde96a13e20f
-#=╠═╡
-qr_algorithm_with_dynamic_shift(A, shift_method=spectral_mean, verbose=true)
-  ╠═╡ =#
+md" #### Ejemplo
+En este ejemplo, el único de los algoritmos que converge es el algoritmo de Rayleigh: `qr_algorithm_with_dynamic_shift(A, shift_method=h_nn)`. Podemos ver que los valores en su diagonal se acercan a sus autovalores.
+"
 
 # ╔═╡ e92c3854-12ad-4ea9-b07b-9f28f549a38d
 md"
 ### Experimentos
+Ahora, realizamos experimentos con la función `compare_qr_algorithms`.
+Esta función permite establecer:
+ * el número máximo de iteraciones, 
+ * el método de generación y el tamaño de las matrices y
+ * el número de muestras por cada tamaño.
 
+Trabajaremos con 5 variaciones del Algoritmo QR:
+ * básico: no_shift
+ * con reducción previa a hessenberg sin desplazamiento: hessenberg
+ * con desplazamiento estático: shift_static
+ * con desplazamiento de Rayleigh: shift_hnn
+ * con desplazamiento de Wilikinson: shift_mean
+
+Luego graficamos los diferentes resultados con `plot_experiment`.
+"
+
+# ╔═╡ be025423-7a8f-4920-8461-03e1e8feda9a
+function plot_experiment(experiment, func; ylabel="", title="", xlabel="Tamaño de la matriz", markers=true, y_max=nothing)
+    plot(title=title, xlabel=xlabel, ylabel=ylabel)
+
+	if y_max !== nothing
+        plot!(ylim = (0, y_max))
+    end
+	
+    for (name, data) in pairs(experiment)
+        (name == :sizes || name == :original_matrix) && continue
+
+        y = func(data, experiment.original_matrix)
+        plot!(
+            experiment.sizes,
+            y,
+            label = string(name),
+            marker =:+
+        )
+    end
+	plot!()
+end
+
+
+# ╔═╡ aed1d4f5-27e7-41f6-96d2-7ca456b6a43a
+md"
+Realizamos dos experimentos que ejecutan los diferentes algoritmos en 5 matrices de cada tamaño. Uno en matrices simétricas y otro en matrices asimétricas con autovalores reales.
+
+A partir de los resultados del experimento. Para cada tamaño vamos a graficar:
+ * el número de iteraciones promedio,
+ * la norma de la subdiagonal final,
+ * el error espectral.
 "
 
 # ╔═╡ 092ceef9-93a1-444c-a535-68d6020d80cc
@@ -307,6 +331,24 @@ function generate_symmetric(n)
 end
 
 # Comparador de algoritmos
+
+# ╔═╡ 22d3f48d-c073-423e-b76b-2724f6ea277d
+A = generate_symmetric(10)
+
+# ╔═╡ 53b315a0-3224-4d8b-b9c1-24095362967e
+display(eigvals(A))
+
+# ╔═╡ e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
+qr_algorithm(A)
+
+# ╔═╡ cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
+qr_algorithm(A, pre_hessenberg=true)
+
+# ╔═╡ 1247d99e-4f28-4d86-aa73-46f49733551d
+qr_algorithm_with_dynamic_shift(A, shift_method=h_nn)
+
+# ╔═╡ 6c7ad571-24ec-47c9-b4e1-bde96a13e20f
+qr_algorithm_with_dynamic_shift(A, shift_method=spectral_mean)
 
 # ╔═╡ 8d9afd5b-309a-4ef3-ae31-13b3f2258e15
 function compare_qr_algorithms(ns; samples=3, maxiter=1000, matrix_generator=generate_symmetric)
@@ -353,40 +395,34 @@ function compare_qr_algorithms(ns; samples=3, maxiter=1000, matrix_generator=gen
 end
 
 
-# ╔═╡ be025423-7a8f-4920-8461-03e1e8feda9a
-function plot_experiment(experiment, func; ylabel="", title="", xlabel="Tamaño de la matriz", markers=true)
-    plot(title=title, xlabel=xlabel, ylabel=ylabel)
-
-    for (name, data) in pairs(experiment)
-        (name == :sizes || name == :original_matrix) && continue
-
-        y = func(data, experiment.original_matrix)
-        plot!(
-            experiment.sizes,
-            y,
-            label = string(name),
-            marker =:+
-        )
-    end
-	plot!()
+# ╔═╡ dcb20efc-9314-4351-98c6-6e9e669bf705
+function generate_nonsymmetric_real_spectrum(n)
+    Λ = Diagonal(randn(n))  # reales
+    Q, _ = qr(randn(n, n))
+    return Q * Λ * inv(Q)
 end
 
 
-# ╔═╡ aed1d4f5-27e7-41f6-96d2-7ca456b6a43a
+# ╔═╡ 69c45c5d-3ed8-4d63-ba27-81af64239feb
+B = generate_nonsymmetric_real_spectrum(10)
+
+# ╔═╡ 45741a6e-83d0-42b3-94a9-8d12affded66
+display(eigvals(B))
+
+# ╔═╡ 19c48544-7a39-4458-808d-5e729d0d542a
+ns = 10:10:100  # Tamaños de matrices
+
+# ╔═╡ 426ac2d5-86a4-42df-bb05-5c5f83d6a07b
+symmetric_experiment = compare_qr_algorithms(ns, samples=5, maxiter=10000)
+
+# ╔═╡ d40bd39a-c7c6-42aa-a288-b86403f3534d
+nonsymmetric_experiment = compare_qr_algorithms(ns, samples=5, maxiter=10000, matrix_generator = generate_nonsymmetric_real_spectrum)
+
+# ╔═╡ 6052b64e-0efa-4832-b5eb-3c82a9b4b4b8
 md"
-Ejecutamos un experimento que ejecuta los diferentes algoritmos en 5 matrices simétricas de cada tamaño.
-
-A partir de los resultados del experimento. Para cada tamaño vamos a graficar:
- * el número de iteraciones promedio,
- * la norma de la subdiagonal final,
- * error.
+#### Número de iteraciones
+Esto permite analizar la convergencia o falta de ella de los diferentes métodos.
 "
-
-# ╔═╡ 442858ad-85c0-42c1-9088-5beb86586b80
-begin
-	ns = 10:10:50  # Tamaños de matrices
-	simetric_experiment = compare_qr_algorithms(ns, samples=5, maxiter=10000)
-end
 
 # ╔═╡ d07ebc60-61f4-4453-a230-bebea063dd12
 function mean_per_size(result_matrix::Matrix{<:NamedTuple}, field::Symbol)
@@ -398,40 +434,33 @@ function mean_per_size(result_matrix::Matrix{<:NamedTuple}, field::Symbol)
 end
 
 
-# ╔═╡ f2ce2b3f-600b-4601-9a8c-314168e7f9ab
-begin
-	plot()
-	for (name, data) in pairs(simetric_experiment)
-		# skip non-result fields
-	    (name == :sizes || name == :original_matrix) && continue
+# ╔═╡ 417223e7-56c1-4c32-b61c-0b811147c8d1
+mean_iterations_per_size(result_matrix, _) = mean_per_size(result_matrix, :iteration)
 
-	    plot!(
-	        simetric_experiment.sizes,
-	        mean_per_size(data, :iteration),
-	        label = string(name)
-	    )
-	end
-	plot!()
-	xlabel!("Tamaño de la matriz (n)")
-	ylabel!("Iteraciones hasta convergencia")
-	title!("Iteraciones promedio en matrices simétricas")
-	#grid!(true)
-end
-
-# ╔═╡ 22ba3cac-a798-47ed-81de-ef59627e92e2
-begin
-	mean_iterations_per_size(result_matrix, _) = mean_per_size(result_matrix, :iteration)
-
+# ╔═╡ 6268f28a-6a7e-48cd-bdbe-27bdc6f3cebf
 plot_experiment(
-    simetric_experiment,
-    mean_iterations_per_size,
-    ylabel = "Número de iteraciones",
-    title = "Iteraciones usadas por cada método"
+	symmetric_experiment,
+	mean_iterations_per_size,
+	ylabel = "Número de iteraciones",
+	title = "Iteraciones usadas en matrices simétricas"
 )
-end
+
+# ╔═╡ 54a2cc81-03dc-48d6-9e5a-e4a427ba594a
+plot_experiment(
+	nonsymmetric_experiment,
+	mean_iterations_per_size,
+	ylabel = "Número de iteraciones",
+	title = "Iteraciones usadas en matrices no simétricas"
+)
+
+# ╔═╡ 0f92ab97-f2fc-40ab-aac8-5de4b09faab2
+md"
+#### Norma de la subdiagonal
+Permite analizar el avance de los algoritmos incluso cuando no han convergido.
+"
 
 # ╔═╡ f77f3bd6-33b9-4e2e-a0fc-fb366314781c
-function mean_subdiagonal_norm_per_size(result_matrix)
+function mean_subdiagonal_norm_per_size(result_matrix,_)
     return [
         mean(subdiagonal_norm(r.Ak) for r in result_matrix[i, :])
         for i in 1:size(result_matrix, 1)
@@ -440,27 +469,41 @@ end
 
 
 # ╔═╡ 35cf02eb-3a1d-4593-abad-f7d8e1a48e14
-begin
-	plot()
-	for (name, data) in pairs(simetric_experiment)
-		# skip non-result fields
-	    (name == :sizes || name == :original_matrix) && continue
-		plot!(
-	        simetric_experiment.sizes,
-	        mean_subdiagonal_norm_per_size(data),
-	        label = string(name)
-	    )
-	end
-	plot!()
-	xlabel!("Tamaño de la matriz (n)")
-	ylabel!("Norma de la subdiagonal al final del algoritmo")
-	title!("Norma promedio en matrices simétricas")
-	#grid!(true)
-end
+plot_experiment(
+	symmetric_experiment,
+	mean_subdiagonal_norm_per_size,
+	ylabel = "Norma de la subdiagonal",
+	title = "Norma de la subdiagonal en matrices simétricas",
+	y_max = 7
+)
+
+# ╔═╡ 58e691cf-4cd9-4fe7-b27a-db79359ad861
+plot_experiment(
+	nonsymmetric_experiment,
+	mean_subdiagonal_norm_per_size,
+	ylabel = "Norma de la subdiagonal",
+	title = "Norma de la subdiagonal en matrices no simétricas",
+	y_max = 7
+)
+
+# ╔═╡ 1ab42500-a871-4952-ac35-7996a57816b9
+plot_experiment(
+	nonsymmetric_experiment,
+	mean_subdiagonal_norm_per_size,
+	ylabel = "Norma de la subdiagonal",
+	title = "Norma de la subdiagonal en matrices no simétricas",
+	y_max = .5
+)
+
+# ╔═╡ bacad826-b26e-43f5-8008-4fc55e1b2ea8
+md"
+#### Error espectral absoluto
+Permite comparar la precisión del resultado del algoritmo: los autovalores de la matriz.
+"
 
 # ╔═╡ 49047a73-728f-4105-b9e1-8245487289e0
 function spectral_error(result::NamedTuple, A::AbstractMatrix)
-    λ_approx = sort(eigvals(result.Ak))
+    λ_approx = sort(diag(result.Ak)) 
     λ_exact  = sort(eigvals(A))
     return norm(λ_approx - λ_exact)
 end
@@ -477,66 +520,34 @@ end
 
 
 # ╔═╡ 27840aa5-4671-4ce6-87b4-82de3d6b3f75
-begin
-	plot()	
-	for (name, data) in pairs(simetric_experiment)
-		# skip non-result fields
-	    (name == :sizes || name == :original_matrix) && continue
-
-		plot!(
-	        simetric_experiment.sizes,
-			mean_spectral_error_per_size(data, simetric_experiment.original_matrix),
-	        label = string(name)
-	    )
-	end
-	plot!()
-	xlabel!("Tamaño de la matriz (n)")
-	ylabel!("Error")
-	title!("Error promedio en matrices simétricas")
-	#grid!(true)
-end
-
-# ╔═╡ 7054e57e-159d-43a4-a01b-ac5a496dec6e
-#ns = 10:250:1010  # Tamaños de matrices
-
-# ╔═╡ ced9f61d-36b1-4695-a198-323ea0df572a
-md"### Comparación de tiempo con/sin Hessenberg"
-
-# ╔═╡ 101b50dd-5bdb-4001-9f61-b1ed7b62df01
-function benchmark_method(f, ns; name="método", argfun=n -> randn(n, n))
-    times = Float64[]
-    
-    for n in ns
-        A = argfun(n)
-        time = @belapsed $f($A)
-        push!(times, time)
-    end
-
-    return (name=name, ns=collect(ns), times=times)
-end
-
-# ╔═╡ a3e01df7-0b84-4b47-a4b4-cbc45ead115c
-md" ## Sensibilidad al valor de desplazamiento"
-
-# ╔═╡ 30cc95d3-239c-436a-ac63-5aca42960cc3
-md" 
-## Estabilidad numérica?
-## Precisión de los autovalores obtenidos"
-
-# ╔═╡ 36527190-6dd4-4a66-8df9-ac977e41d454
-md"
-ToDo:
-- Add names
-- Expand ns
-
-Experimentos:
-- Número de iteraciones (convergencia)  |  numero de copias = 5, cambiar nombres
+plot_experiment(
+	symmetric_experiment,
+	mean_spectral_error_per_size,
+	ylabel = "Error espectral promedio",
+	title = "Precisión espectral en matrices simétricas",
+	y_max = 2
+)
 
 
-- Sensibilidad al valor del shift (autovalor, cercano a autovalor, media espectral, lejano): Número de iteraciones para que $h_{n,n+1}$
-- Tasa de convergencia (Hessenberg vs shift): Evolución del error $h_{n,n-1}<10^{-12}$
+# ╔═╡ 6b0504ad-414d-4244-b364-56a6803b22e1
+plot_experiment(
+	symmetric_experiment,
+	mean_spectral_error_per_size,
+	ylabel = "Error espectral promedio",
+	title = "Precisión espectral en matrices simétricas",
+	y_max = .2
+)
 
-"
+
+# ╔═╡ f15144fa-f06b-4959-aa4e-212e739ff5d5
+plot_experiment(
+	nonsymmetric_experiment,
+	mean_spectral_error_per_size,
+	ylabel = "Error espectral promedio",
+	title = "Precisión espectral en matrices no simétricas",
+	y_max = 0.2
+)
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1666,50 +1677,56 @@ version = "1.4.1+2"
 """
 
 # ╔═╡ Cell order:
-# ╠═83f28dee-479c-11f0-1d09-13dd69989556
+# ╟─83f28dee-479c-11f0-1d09-13dd69989556
 # ╠═b0581d93-b1b9-41e2-9e2f-fede19457913
-# ╠═1b901f7e-934b-4044-9514-687914d1bde4
+# ╟─1b901f7e-934b-4044-9514-687914d1bde4
 # ╠═185f632d-3fb4-4a3d-adf7-ce6958c9c96e
-# ╠═7c313dea-4379-44d9-bf91-91bfc21db53d
+# ╟─7c313dea-4379-44d9-bf91-91bfc21db53d
 # ╠═cacc4b88-6533-4f42-a9cd-f55bce2331ec
 # ╠═4aa7503f-fe36-490c-97bd-57bf7fa14ae2
 # ╠═e1f0ae1e-0703-461c-b82b-f97ed64f347c
 # ╠═ad0522e5-eaab-4042-9811-34d012b5172d
 # ╠═02f8eba5-09d5-4ff0-ac76-dff1e6b1152d
-# ╠═5afdb1df-663c-4264-8d72-038664900424
+# ╟─5afdb1df-663c-4264-8d72-038664900424
 # ╠═a221ebbc-1836-4954-9d45-21f1bdece6dd
-# ╠═ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
+# ╟─ff0d86f9-0b85-4a7b-a4f8-5ac0030fb98e
 # ╠═16fc77f2-f355-4f45-bd38-26eb2433d8bc
 # ╠═a04604ea-e7ca-458d-a722-cfcf4439dbd8
 # ╠═ddeb09df-1fd8-4360-baf3-b9cd12ac6305
 # ╠═284f0bb6-2e47-49b3-9b07-eb06ce014694
-# ╠═be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
+# ╟─be38c420-97f6-4a5e-95e1-7e5dc1f92cc5
 # ╠═22d3f48d-c073-423e-b76b-2724f6ea277d
-# ╠═121d2749-18d1-4c4f-a67c-aaf0d51d4aef
 # ╠═53b315a0-3224-4d8b-b9c1-24095362967e
+# ╠═69c45c5d-3ed8-4d63-ba27-81af64239feb
+# ╠═45741a6e-83d0-42b3-94a9-8d12affded66
 # ╠═e9219e9c-e0eb-4ad6-8a8d-4b704fc06485
 # ╠═cfbd9fdd-ec57-480b-8283-b47e33dcb9e6
 # ╠═1247d99e-4f28-4d86-aa73-46f49733551d
 # ╠═6c7ad571-24ec-47c9-b4e1-bde96a13e20f
-# ╠═e92c3854-12ad-4ea9-b07b-9f28f549a38d
-# ╠═092ceef9-93a1-444c-a535-68d6020d80cc
+# ╟─e92c3854-12ad-4ea9-b07b-9f28f549a38d
 # ╠═8d9afd5b-309a-4ef3-ae31-13b3f2258e15
 # ╠═be025423-7a8f-4920-8461-03e1e8feda9a
-# ╠═aed1d4f5-27e7-41f6-96d2-7ca456b6a43a
-# ╠═442858ad-85c0-42c1-9088-5beb86586b80
+# ╟─aed1d4f5-27e7-41f6-96d2-7ca456b6a43a
+# ╠═092ceef9-93a1-444c-a535-68d6020d80cc
+# ╠═dcb20efc-9314-4351-98c6-6e9e669bf705
+# ╠═19c48544-7a39-4458-808d-5e729d0d542a
+# ╠═426ac2d5-86a4-42df-bb05-5c5f83d6a07b
+# ╠═d40bd39a-c7c6-42aa-a288-b86403f3534d
+# ╟─6052b64e-0efa-4832-b5eb-3c82a9b4b4b8
 # ╠═d07ebc60-61f4-4453-a230-bebea063dd12
-# ╠═f2ce2b3f-600b-4601-9a8c-314168e7f9ab
-# ╠═22ba3cac-a798-47ed-81de-ef59627e92e2
+# ╠═417223e7-56c1-4c32-b61c-0b811147c8d1
+# ╠═6268f28a-6a7e-48cd-bdbe-27bdc6f3cebf
+# ╠═54a2cc81-03dc-48d6-9e5a-e4a427ba594a
+# ╟─0f92ab97-f2fc-40ab-aac8-5de4b09faab2
 # ╠═f77f3bd6-33b9-4e2e-a0fc-fb366314781c
 # ╠═35cf02eb-3a1d-4593-abad-f7d8e1a48e14
+# ╠═58e691cf-4cd9-4fe7-b27a-db79359ad861
+# ╠═1ab42500-a871-4952-ac35-7996a57816b9
+# ╟─bacad826-b26e-43f5-8008-4fc55e1b2ea8
 # ╠═49047a73-728f-4105-b9e1-8245487289e0
 # ╠═6dc1d2b1-1095-4d3d-ab94-258d398e3e9c
 # ╠═27840aa5-4671-4ce6-87b4-82de3d6b3f75
-# ╠═7054e57e-159d-43a4-a01b-ac5a496dec6e
-# ╠═ced9f61d-36b1-4695-a198-323ea0df572a
-# ╠═101b50dd-5bdb-4001-9f61-b1ed7b62df01
-# ╠═a3e01df7-0b84-4b47-a4b4-cbc45ead115c
-# ╠═30cc95d3-239c-436a-ac63-5aca42960cc3
-# ╠═36527190-6dd4-4a66-8df9-ac977e41d454
+# ╠═6b0504ad-414d-4244-b364-56a6803b22e1
+# ╠═f15144fa-f06b-4959-aa4e-212e739ff5d5
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

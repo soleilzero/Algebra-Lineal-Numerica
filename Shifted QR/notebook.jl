@@ -6,55 +6,31 @@ using InteractiveUtils
 
 # ╔═╡ c478a7cc-42b0-11f0-1c45-919167ce835a
 md"
-# The shifted QR iteration
-"
-
-# ╔═╡ 17dbbafe-fe46-4001-a1a0-5636395e89d8
-md"
-Plan:
-1. Introducción
- * Objetivos
- * Nociones
- * Motivación
-2. Teoría
- * Recap of eigenvalue problems.
- * The basic QR algorithm.
- * The shifted QR method (Wilkinson shift, etc.).
- * Convergence behavior and complexity.
-3. Implementación
-
- * Code for the unshifted QR algorithm (for comparison).
-
- * Code for the shifted QR algorithm.
-
- * Optional: Use of Hessenberg reduction to optimize performance.
-4. Experimentos
-5. Análisis
+# El algoritmo QR con desplazamiento
 "
 
 # ╔═╡ 5a04ad92-ed1f-4674-858a-f36de9a335a4
 md"
-## Introducción
 ### Objetivos
-* Explicar claramente el método de descomposición QR con desplazamiento, haciendo énfasis en los aspectos teóricos y computacionales relevantes,
 
-* implementar el algoritmo de Shifted QR en Julia,
+* Explicar claramente el algoritmo QR con desplazamiento, haciendo énfasis en los aspectos teóricos y computacionales relevantes,
 
-* realizar experimentos numéricos bien diseñados, que permitan ilustrar el comportamiento del método bajo diferentes condiciones (tamaño de matrices, precisión, número de iteraciones, etc.),
+* implementar el algoritmo QR con desplazamiento en Julia,
+
+* realizar experimentos numéricos bien diseñados, que permitan ilustrar el comportamiento del método bajo diferentes condiciones,
 
 * analizar y discutir los resultados, con observaciones fundamentadas tanto en la teoría como en los datos obtenidos.
 
 * resumir los hallazgos más relevantes y, plantear preguntas o ideas para trabajo futuro.
+"
 
-### Motivación
-### ?
-Aceleración de convergencia
-Eficiencia en algoritmos modernos (desplazamientos—explícitos o implícitos—incrementan el aislamiento de subbloques triangulares de la matriz, reduciendo rápidamente la parte activa del problema)
+# ╔═╡ a336d60c-17a5-4961-85ac-672265666e94
+md"
+## Teoría 
 "
 
 # ╔═╡ 06a284b8-ab2d-4b12-9153-5f8e88485e78
 md"
-## Teoría 
 
 ### Método QR básico y limitaciones
 
@@ -115,15 +91,13 @@ $|(A^{(k)})_{i+1, i}| = O\left(\left|\frac{\lambda_{i+1}}{\lambda_i}\right|^k\ri
 
 Es decir que el algoritmo QR sin shift **converge linealmente**, y su velocidad depende del cociente entre valores propios consecutivos. La convergencia puede ser muy lenta si los valores propios están cercanos en magnitud.
 
-##### Estabilidad del método QR básico
+#### Estabilidad del método QR básico
 
 El método QR se basa en transformaciones ortogonales (o unitarias, en el caso complejo), las cuales son numéricamente estables porque **preservan la norma 2** y no amplifican los errores de redondeo. En cada paso, se realiza una transformación de similaridad de la forma:
 
 $A_{k+1} = Q_k^\top A_k Q_k$
 
 Estas transformaciones no degradan la condición del problema ni introducen inestabilidad inherente. Por esta razón, el método QR es considerado numéricamente estable: los autovalores obtenidos son aproximaciones fiables de los autovalores exactos de la matriz original, dentro de los límites del error de redondeo.
-
----
 
 #### Precisión del método QR básico
 
@@ -137,21 +111,79 @@ Según el análisis de Golub y Van Loan, el método QR aplicado a una matriz sim
 $|\hat{\lambda}_i - \lambda_i| \approx u \|A\|_2$
 
 donde $u$ es la unidad de redondeo (por ejemplo, $u \approx 10^{-16}$ en doble precisión), y $\|A\|_2$ es la norma espectral de la matriz.
+
+---
+"
+
+# ╔═╡ 1f13c902-d77b-4521-829c-3502f82c438d
+md"
+
+### Método QR con reducción previa a forma Hessenberg
+#### Matrices de Hessenberg
+
+Una matriz $H \in \mathbb{R}^{n \times n}$ se dice que está en **forma de Hessenberg superior** si:
+
+$h_{ij} = 0 \quad \text{para } i > j+1$
+
+Es decir, todos los elementos **por debajo de la subdiagonal** son cero.
+
+Por ejemplo, una matriz de Hessenberg de orden 4 tiene la forma:
+
+$H = \begin{bmatrix}
+* & * & * & * \\
+* & * & * & * \\
+0 & * & * & * \\
+0 & 0 & * & *
+\end{bmatrix}$
+
+**Propiedades:**
+
+* Si la matriz original $A$ es simétrica, la forma de Hessenberg será **tridiagonal**.
+
+### Algoritmo
+
+Dado $A \in \mathbb{R}^{n \times n}$, el algoritmo comienza con una **reducción ortogonal** a forma de Hessenberg:
+
+$A = Q^\top H Q$
+
+donde $Q$ es ortogonal y $H$ es Hessenberg. A partir de allí, se aplican iteraciones QR:
+
+1. $H_k = Q_k R_k$ (factorización QR de la matriz desplazada),
+2. $H_{k+1} = R_k Q_k$
+
+Gracias a que $H_k$ es Hessenberg, estas operaciones se realizan en tiempo reducido, y la estructura se conserva en cada paso.
+
+### Ventajas
+
+En el método QR (con o sin desplazamiento), cada iteración requiere calcular la factorización QR de la matriz actual $A_k$. Si $A_k$ es densa, esta operación cuesta $O(n^3)$ flops. En cambio:
+
+> Si $A_k$ tiene forma de Hessenberg, su factorización QR puede realizarse en $O(n^2)$ flops usando **rotaciones de Givens**, que operan sólo sobre los elementos no nulos.
+
+Además:
+
+* La forma de Hessenberg **se preserva** bajo cada iteración QR con desplazamiento:
+
+  $A_k - \mu_k I = Q_k R_k \quad \Rightarrow \quad A_{k+1} = R_k Q_k + \mu_k I$
+
+  implica que si $A_k$ es Hessenberg, entonces $A_{k+1}$ también lo es.
+
+Esto significa que **basta con reducir la matriz original una sola vez** a forma de Hessenberg antes de iniciar el proceso iterativo.
+
+---
 "
 
 # ╔═╡ 891fb287-b56b-46e1-bd7c-93eb7ca4c9ad
 md"""
-## Método QR con shift
+## Método QR con desplazamiento
 ### Motivación
 
 Dado que la velocidad de convergencia del método QR básico es el cociente entre los dos primeros autovalores, este método puede presentar **convergencia lenta** cuando los autovalores de la matriz están cercanos entre sí. Esta lentitud se traduce en una mayor cantidad de iteraciones y, por tanto, un mayor costo computacional.
 
 ### Definición
 
-Sea $A \in \mathbb{R}^{n \times n}$ una matriz real. El **método QR con desplazamiento** es una variante del algoritmo QR clásico que acelera la convergencia mediante la incorporación de un escalar $\mu_k \in \mathbb{R}$ en cada iteración.
+Se realiza sobre matrices de Hessenberg.
 
-##### Tipos
-Estático vs dinámico
+Sea $A \in \mathbb{R}^{n \times n}$ una matriz real. El **método QR con desplazamiento** es una variante del algoritmo QR clásico que acelera la convergencia mediante la incorporación de un escalar $\mu_k \in \mathbb{R}$ en cada iteración.
 
 #### Esquema general de la iteración
 
@@ -167,7 +199,7 @@ Dado $A_0 := A$, para cada $k \geq 0$ realizamos:
 
    $A_{k+1} = R_k Q_k + \mu_k I$
 
-##### Justificación algebraica del shift estático
+#### Justificación algebraica del shift estático
 Esta operación puede reescribirse como:
 $A_{k+1} = Q_k^\top A_k Q_k$,
 debido a que:
@@ -184,141 +216,227 @@ $= A_k$
 
 Esto implica que $A_{k+1} \sim A_k \sim A$: la matriz resultante es similar a la anterior, y por tanto **preserva los autovalores**. En otras palabras, el método QR con shift genera una sucesión de matrices similares entre sí.
 
-#### Forma de Hessenberg
-Las matrices de Hessenberg
-...
-#### Elección del desplazamiento
-#### Variando el desplazamiento
-Escogiendo $h_{nn}$ cada vez.
 
-#### Convergencia
-La convergencia es lineal, y el cociente espectral afecta el ritmo de convergencia:
-$\bigg|\frac{\lambda_{i+1}−u}{\lambda_i−u}\bigg|^k.$ (Analizado en la sección 7.5.2)
+### Tipos de desplazamiento
+
+Los desplazamientos $\mu_k$ pueden clasificarse según cómo se seleccionan en cada iteración:
+
+#### Desplazamiento **estático**
+
+Se fija un valor constante $\mu_k = \mu$ para todas las iteraciones. Es fácil de implementar, pero su eficacia depende fuertemente de que \( \mu \) esté cerca de algún autovalor dominante. La convergencia sigue siendo lineal en general.
+
+#### Desplazamiento **dinámico**
+
+El valor de $\mu_k$ se **actualiza en cada iteración** en función del contenido espectral de la matriz actual $A_k$. Este tipo de desplazamiento busca adaptarse dinámicamente a la estructura de la matriz para acelerar la convergencia.
+
+Entre los desplazamientos dinámicos más comunes se encuentran:
+
+- **Shift de Rayleigh**:  
+  Usa una estimación del autovalor dominante basada en el cociente de Rayleigh asociado a un vector aproximado.
+
+- **Shift de Wilkinson**:  
+  Basado en los autovalores de la submatriz $2 \times 2$ en la esquina inferior derecha de $A_k$.
+
+- **Multishift (shifts múltiples)**:  
+  Usa varios desplazamientos simultáneamente para mejorar la convergencia global, especialmente en implementaciones paralelas o matrices grandes.
 
 
-Un shift estático no induce deflación rápida, a diferencia del shift dinámico basado en Rayleigh o Wilkinson. 
+### Convergencia
+
+El uso de desplazamientos en el método QR tiene un impacto directo en la velocidad de convergencia hacia la forma triangular (o diagonal, en el caso simétrico). A diferencia del QR sin desplazamiento, cuya convergencia es lineal, los desplazamientos permiten obtener tasas **aceleradas** de convergencia, especialmente cuando se emplean estrategias dinámicas.
+
+#### Shift estático
+
+Como se analizó en la sección 7.5.2 de *Matrix Computations*, si se utiliza un desplazamiento constante $\mu$, la convergencia del método sigue siendo **lineal**, y su velocidad depende del cociente entre los valores propios modificados por el shift. En particular, si $\lambda_1, \lambda_2, \dots$ son los autovalores de $A$ ordenados por cercanía a $\mu$, entonces la velocidad de convergencia de la componente asociada a $\lambda_1$ es proporcional a:
+
+$\left| \frac{\lambda_2 - \mu}{\lambda_1 - \mu} \right|^k$
+
+Por tanto, para que el método converja rápidamente hacia $\lambda_1$, es deseable que $\mu$ esté lo más cerca posible de este autovalor.
+
+#### Shift dinámico
+
+Cuando el shift $\mu_k$ se actualiza en cada iteración de acuerdo a la evolución espectral de la matriz $A_k$, se puede lograr **convergencia cuadrática** en casos favorables. El ejemplo más importante es el **shift de Wilkinson**, aplicado a matrices simétricas tridiagonales:
+
+En este caso, si 
+- la matriz $A_k$ es simétrica tridiagonal,
+- y se utiliza el shift de Wilkinson,
+entonces la entrada subdiagonal $a_{n,n-1}^{(k)}$ decrece cuadráticamente:
+  
+$|a_{n,n-1}^{(k)}| = O\left( |a_{n,n-1}^{(k-1)}|^2 \right)$
+
+Este comportamiento acelerado permite realizar **deflación efectiva**, es decir, aislar autovalores individuales tras pocas iteraciones, y aplicar el método recursivamente sobre bloques más pequeños.
+
+#### Comparación
+
+| Tipo de shift     | Velocidad de convergencia | Complejidad por iteración | Adaptabilidad |
+|-------------------|---------------------------|----------------------------|----------------|
+| Ninguno           | Lineal                    | $O(n^2)$ con Hessenberg     | Ninguna        |
+| Estático          | Lineal (mejorada)         | $O(n^2)$                    | Fija           |
+| Dinámico (Wilkinson) | Cuadrática              | $O(n^2)$                    | Alta           |
+
+---
 """
 
-# ╔═╡ e4c54b68-e57e-4dc4-ba2e-bdc055ec67ba
-md"
-### Versión cambiando valor
-#### Convergencia 
-Con mucho gusto. A continuación presento una redacción formal para la subsección **Convergencia del método QR con desplazamiento**, basada en *Matrix Computations* (Golub & Van Loan, 4ta ed., sección 7.5.2), en un estilo acorde al notebook:
+# ╔═╡ e6ec2b75-1005-4be3-aa5a-eec36550ff25
+md"## Análisis computacional
+
+### Implementación y experimentos
+
+La implementación de los algoritmos y los experimentos realizados pueden ser consultados en el anexo correspondiente. En él se detallan las variantes del método QR implementadas y los criterios numéricos utilizados para evaluar su desempeño.
+
+### Análisis de resultados computacionales
+
+En la sección de experimentos se graficaron tres métricas relevantes para evaluar la eficiencia y precisión de los algoritmos:
+
+- El **número de iteraciones promedio** hasta convergencia,
+- La **norma de la subdiagonal promedio**, y
+- El **error espectral promedio**,
+
+para matrices tanto **simétricas** como **no simétricas**, todas con espectro real. Cada punto experimental corresponde al promedio de 5 muestras aleatorias del tamaño de matriz indicado, con el objetivo de observar tendencias generales.
+
+#### Iteraciones
+
+El **número de iteraciones** nos permite visualizar el comportamiento de convergencia de cada método:
+
+- En matrices **simétricas**, el método `no_shift` fue el que más rápido convergió.
+- En matrices **no simétricas**, los métodos `shift_hnn` y `shift_mean` mostraron un mejor desempeño conforme aumentó el tamaño de la matriz.
+- Los métodos `hessenberg` y `shift_static` se ubicaron en un punto intermedio.
+
+A primera vista, podría parecer sorprendente que los desplazamientos espectrales mejoren más en matrices no simétricas que en simétricas. Sin embargo, esto se explica por las características de las matrices generadas:
+
+- Las matrices simétricas fueron generadas con `A + A'`, lo que produce matrices densas, simétricas pero **no tridiagonales**. En este caso, el algoritmo QR con desplazamiento **no alcanza la convergencia cuadrática** que se observa en matrices tridiagonales, donde el shift de Wilkinson es más eficaz.
+
+- Las matrices no simétricas fueron construidas como $A = Q \Lambda Q^{-1}$, con $\Lambda$ diagonal real. Esto garantiza que todas tengan **espectro real y bien condicionado**, y por tanto, el desplazamiento (incluso aproximado) puede acelerar eficazmente la convergencia.
+
+En resumen, el comportamiento observado está en línea con la teoría: **el desplazamiento dinámico funciona mejor cuando puede explotar información espectral útil**, lo cual no sucede completamente en matrices simétricas densas pero sí en matrices no simétricas bien estructuradas.
+
+#### Norma de la subdiagonal
+
+La **norma de la subdiagonal** fue utilizada como criterio de parada. Aunque teóricamente permite evaluar qué tan cerca está la matriz de ser triangular, en estos experimentos la mayoría de las matrices alcanzaron convergencia completa, por lo que esta métrica no aportó información diferenciadora significativa en esta prueba.
+
+#### Precisión espectral
+
+La **precisión espectral**, medida como el error relativo promedio en los autovalores obtenidos, mostró:
+
+- Diferencias mínimas entre métodos (excepto `no_shift`, ligeramente peor en casos no simétricos).
+- Mejores resultados en matrices **no simétricas** que en las simétricas, lo cual puede deberse a una **mayor separación espectral promedio** y mejor condicionamiento de las matrices generadas como $Q \Lambda Q^{-1}$.
 
 ---
 
-### 📈 Convergencia del método QR con desplazamiento
+## Resultados
 
-El método QR sin desplazamiento converge en general **lentamente**, especialmente cuando los autovalores están próximos entre sí o no bien separados en magnitud. La introducción de un desplazamiento $\mu_k$ en cada iteración no sólo acelera la convergencia, sino que **altera el comportamiento espectral de forma favorable**.
+A lo largo de este trabajo se ha estudiado el método QR para el cálculo de autovalores reales, con énfasis en su versión con desplazamiento espectral. Se ha desarrollado una presentación teórica cuidadosa del algoritmo QR básico, sus limitaciones, y cómo la incorporación de desplazamientos (shifts) mejora su comportamiento. Los aspectos computacionales fueron explorados en un cuaderno anexo mediante distintas implementaciones y experimentos controlados.
 
-#### 🧠 Intuición espectral
+Desde el punto de vista **teórico**, el método QR con desplazamiento:
 
-El desplazamiento tiene el efecto de acercar un autovalor particular al origen del espectro de la matriz desplazada $A_k - \mu_k I$. Como el algoritmo QR aplicado a una matriz desplazada se comporta análogamente al **método de la potencia inversa**, este desplazamiento **atrae la convergencia hacia el autovalor más cercano a $\mu_k$**.
+- Conserva el espectro de la matriz original mediante transformaciones ortogonales.
+- Acelera la convergencia en comparación con el método QR sin desplazamiento, especialmente cuando los autovalores están cercanos.
+- Al emplear desplazamientos dinámicos, como el shift de Wilkinson, se puede lograr convergencia cuadrática en matrices simétricas tridiagonales.
+- Su eficiencia mejora significativamente cuando se aplica a matrices previamente reducidas a forma de Hessenberg.
 
-Después de reconstruir la matriz con $A_{k+1} = R_k Q_k + \mu_k I$, ese autovalor aparece más claramente en la forma (cuasi)triangular de $A_{k+1}$.
+Desde el punto de vista **computacional**, los experimentos mostraron que:
 
----
+- El QR sin desplazamiento (`no_shift`) funciona bien en matrices simétricas pequeñas, pero escala peor que las versiones con desplazamiento.
+- El desplazamiento dinámico (`shift_hnn`) mostró mejor rendimiento en matrices **no simétricas**, lo cual puede explicarse porque dichas matrices fueron generadas con espectro real y bien condicionado, permitiendo al algoritmo separar eficientemente los autovalores.
+- En matrices simétricas densas (no tridiagonales), el beneficio del desplazamiento dinámico fue menor, debido a que no se alcanza la convergencia cuadrática teóricamente esperada.
+- La reducción previa a forma de Hessenberg permitió realizar iteraciones más eficientes sin pérdida de precisión.
+- Todos los métodos (excepto `no_shift`) mostraron una precisión espectral comparable, con errores pequeños y estables a lo largo de los experimentos.
 
-### 🧪 Resultados teóricos
-
-#### 🔹 Caso simétrico (autovalores reales y ortogonal diagonalización)
-
-Si $A \in \mathbb{R}^{n \times n}$ es simétrica, entonces el método QR con desplazamiento converge **cuadráticamente** hacia una matriz diagonal:
-
-$$\lim_{k \to \infty} A_k = \operatorname{diag}(\lambda_1, \dots, \lambda_n)$$
-
-y los vectores $Q_0 Q_1 \cdots Q_k$ convergen a una matriz ortogonal cuyos vectores columna son autovectores de $A$.
-
-> **Con desplazamiento**, la velocidad de convergencia se ve aumentada en comparación al caso sin shift. En particular, se muestra (ver GVL, §7.5.2) que:
->
-> * Si $A$ es simétrica tridiagonal,
-> * y se usa un desplazamiento de Wilkinson (definido más adelante),
->
-> entonces los elementos subdiagonales convergen a cero a **una velocidad cuadrática**, i.e., $|a_{n,n-1}^{(k)}| = O(|a_{n,n-1}^{(k-1)}|^2)$.
-
-Esta mejora se debe a que el shift de Wilkinson se elige estratégicamente para aproximar un autovalor dominante en la esquina inferior de la matriz, lo que acelera la separación espectral de ese valor.
+En conjunto, estos resultados confirman las predicciones teóricas: el uso de desplazamientos espectrales en el método QR mejora la eficiencia sin sacrificar la estabilidad ni la precisión, especialmente cuando se combina con una estructura numérica favorable como la forma de Hessenberg. La elección del tipo de desplazamiento (estático o dinámico) y su implementación práctica deben adaptarse al tipo de matriz y a las características del espectro esperadas.
 
 ---
-
-### ⏱ Comparación entre QR sin shift y con shift
-
-| Característica            | QR sin desplazamiento   | QR con desplazamiento            |
-| ------------------------- | ----------------------- | -------------------------------- |
-| Velocidad de convergencia | Lineal                  | Cuadrática (en casos favorables) |
-| Estructura aprovechada    | Ninguna                 | Tridiagonal (ideal), simetría    |
-| Posibilidad de deflación  | Difícil                 | Natural (cuando subdiagonal → 0) |
-| Costo por iteración       | $O(n^2)$ con Hessenberg | Igual, pero menos iteraciones    |
-| Práctico para uso real    | No                      | Sí                               |
-
----
-
-### 📌 Comentario adicional: efecto en matrices no simétricas
-
-En matrices generales (no simétricas), el método QR con shift no necesariamente converge a una forma diagonal, sino a la **forma de Schur** (triangular superior). No obstante, el desplazamiento sigue siendo útil: acelera la aparición de valores dominantes en la diagonal, y favorece la **deflación** local.
-
-
-#### Complejidad
-
-
-
-
-#### 💻 Eficiencia computacional
-
-* Para matrices generales, el costo por iteración es $O(n^3)$.
-* Sin embargo, si $A_k$ se mantiene en **forma de Hessenberg** (lo cual es usual en implementaciones prácticas), el costo se reduce a $O(n^2)$ por iteración, gracias a la estructura esparsa.
-
-Este algoritmo constituye la base de la versión moderna del QR para cómputo de autovalores y es utilizado en bibliotecas numéricas como LAPACK.
-
 "
 
-# ╔═╡ 6db839bb-ea7b-486d-9ef0-19d476273b85
-md"
-# Notas
+# ╔═╡ 94ee88f4-7fbf-4725-a7a3-93268c04ad7e
+md"""
+## Reflexión
 
-#### 📌 Observaciones importantes
+Este proyecto representó un ejercicio completo en el análisis teórico, la implementación computacional y la evaluación experimental de un algoritmo numérico clásico. A lo largo del desarrollo, se enfrentaron desafíos tanto conceptuales como técnicos, que permitieron consolidar aprendizajes valiosos en álgebra lineal numérica y cómputo científico.
 
-* Si $\mu_k = 0$ para todo $k$, se recupera el método QR sin desplazamiento.
-* A diferencia del QR clásico, el uso del shift permite orientar la iteración hacia una parte específica del espectro.
-* Las iteraciones están diseñadas para hacer que ciertos elementos subdiagonales de $A_k$ se reduzcan rápidamente a cero, facilitando la **deflación**.
+Una de las principales dificultades fue comprender en profundidad el impacto de los desplazamientos espectrales en la convergencia del método QR. Si bien la teoría (especialmente en el caso simétrico tridiagonal) es clara, su comportamiento práctico depende fuertemente de la estructura espectral y de la forma de la matriz. Esto se reflejó en los experimentos, donde algunos resultados desafiaron las expectativas iniciales, especialmente en el caso de matrices no simétricas.
 
-#### 💡 Justificación algebraica
+Desde el punto de vista computacional, fue importante diseñar y controlar los experimentos de manera reproducible, equilibrando la variabilidad inherente a los datos aleatorios con la necesidad de obtener resultados estadísticamente representativos. Además, implementar versiones eficientes del algoritmo (por ejemplo, con reducción a forma de Hessenberg) exigió atención cuidadosa a los detalles numéricos y estructurales.
 
-Sea $A_k = Q_k R_k + \mu_k I$, con
+A nivel personal, el proyecto reforzó la importancia de conectar teoría y práctica en problemas numéricos. Aprendí a interpretar con mayor madurez los resultados de un algoritmo, considerando tanto sus fundamentos matemáticos como sus condiciones de uso realistas. También adquirí mayor familiaridad con herramientas computacionales para simular, visualizar y comparar algoritmos iterativos, siguiendo buenas prácticas de código.
 
-$A_k - \mu_k I = Q_k R_k \quad \Rightarrow \quad A_k = Q_k R_k + \mu_k I$
+### Trabajo futuro
 
-Entonces:
+El proyecto deja abiertas varias posibilidades de extensión y mejora, tanto en la profundidad del análisis como en la variedad de experimentos:
 
-$A_{k+1} = R_k Q_k + \mu_k I = Q_k^\top A_k Q_k$
+- **Ampliar el tamaño de las matrices y el número máximo de iteraciones**, para explorar cómo escalan los algoritmos en casos más demandantes y confirmar tendencias asintóticas de convergencia.
 
-Esto implica que cada paso es una transformación ortogonal de similaridad: la matriz $A_k$ es transformada por conjugación ortogonal con $Q_k$. Por lo tanto, todos los $A_k$ son ortogonalmente similares entre sí, y sus autovalores (en exactitud matemática) son idénticos.
+- **Sustituir los promedios por visualizaciones individuales (como diagramas de dispersión)**, con el fin de detectar y excluir outliers que puedan distorsionar el análisis global. Esto permitiría observar la variabilidad interna de los resultados con mayor precisión.
 
+- **Comparar distintas estrategias de desplazamiento dinámico**, incluyendo el shift de Wilkinson verdadero en matrices tridiagonales y experimentos con matrices mal condicionadas o con espectro complejo.
 
+- **Estudiar la estabilidad numérica de los métodos en presencia de perturbaciones**, analizando la sensibilidad de los autovalores aproximados frente a errores en los datos o en los cálculos intermedios.
 
-#### 🧠 Interpretación espectral
+Estas direcciones futuras permitirían consolidar una comprensión aún más profunda del método QR y su comportamiento computacional, y abrir la puerta a comparaciones con otros métodos espectrales avanzados.
 
-En el contexto de autovalores, restar $\mu_k I$ a $A_k$ equivale a considerar los autovalores $\lambda_i - \mu_k$. El paso QR actúa como una iteración que **reduce la dispersión de los autovalores en torno a cero**, y la restauración con $+\mu_k I$ devuelve la escala original. De este modo, si $\mu_k$ es cercano a un autovalor real de $A_k$, esa componente será realzada en la iteración siguiente.
+---
 
-"
+## Declaración de fuentes externas
 
-# ╔═╡ 16b57aca-a13d-4774-8f58-17b795e58c01
-md"
-## Análisis numérico
-### Implementación
-#### #1
-#### #2
-### Comparación de tiempo
-#### Con matrices normales y de Hessenberg
-#### Diferencias de tamaño
-### Comparación de estabilidad numérica
-"
+### Uso de IA
+
+Durante el desarrollo de este trabajo se utilizó el modelo de lenguaje ChatGPT (OpenAI) como herramienta de apoyo académico. En particular, la IA fue empleada para:
+
+- **Redacción técnica y explicación teórica:**  
+  Solicité apoyo para redactar secciones del informe relacionadas con la teoría del método QR, incluyendo motivación, definición formal, análisis de convergencia, estructura de Hessenberg y desplazamientos espectrales (estáticos y dinámicos).
+
+- **Revisión del estilo académico:**  
+  La IA fue utilizada como asistente editorial para mejorar la claridad, organización y precisión de las secciones escritas.
+
+- **Apoyo conceptual en interpretación de resultados:**  
+  Se consultó a la IA para analizar comportamientos inesperados observados en los experimentos, especialmente la diferencia entre el desempeño del QR con desplazamiento en matrices simétricas y no simétricas.
+
+- **Sugerencias de estructura del documento:**  
+  Recibí ayuda para organizar el informe en secciones coherentes: teoría, análisis computacional, resultados, reflexión y declaración de fuentes.
+
+- **Código (mínimamente):**  
+  Si bien el código fue desarrollado directamente por el autor, se consultó a la IA para aclarar aspectos conceptuales de algunas funciones (por ejemplo, generación de matrices con espectro real o estructura simétrica).
+
+#### Prompts principales utilizados
+
+A lo largo del proceso, se formularon consultas como:
+
+- *"Explica el método QR con desplazamiento con base en el libro de Golub y Van Loan."*
+- *"Justifica algebraicamente por qué el QR con shift conserva el espectro."*
+- *"Redacta una sección de reflexión sobre las dificultades y aprendizajes del proyecto."*
+- *"¿Por qué el QR con shift puede comportarse mejor en matrices no simétricas?"*
+
+Todas las respuestas obtenidas fueron evaluadas críticamente, reescritas cuando fue necesario y validadas.
+
+---
+
+### Recursos utilizados
+
+- **Libro guía:**  
+  Golub, G. H., & Van Loan, C. F. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.  
+  Secciones 7.3, 7.4 y 7.5.2 fueron las principales referencias teóricas.
+
+- **Lenguaje Julia y librerías estándar:**  
+  Para implementar algoritmos QR y realizar experimentos numéricos, se utilizaron los paquetes estándar `LinearAlgebra` y `Plots` en el entorno Pluto.jl.
+
+---
+
+### Declaración ética
+
+Este trabajo se ha desarrollado respetando principios de honestidad académica y responsabilidad intelectual:
+
+- El uso de IA se ha declarado de forma transparente.
+- Toda fuente externa consultada ha sido debidamente citada.
+- Las ideas, interpretaciones y decisiones sobre el contenido final son responsabilidad del autor.
+- El trabajo ha sido realizado con el propósito de aprender, comprender y aplicar técnicas de álgebra lineal numérica, no de delegar su ejecución.
+
+"""
 
 # ╔═╡ Cell order:
 # ╟─c478a7cc-42b0-11f0-1c45-919167ce835a
-# ╟─17dbbafe-fe46-4001-a1a0-5636395e89d8
 # ╟─5a04ad92-ed1f-4674-858a-f36de9a335a4
-# ╠═06a284b8-ab2d-4b12-9153-5f8e88485e78
-# ╠═891fb287-b56b-46e1-bd7c-93eb7ca4c9ad
-# ╟─e4c54b68-e57e-4dc4-ba2e-bdc055ec67ba
-# ╟─6db839bb-ea7b-486d-9ef0-19d476273b85
-# ╠═16b57aca-a13d-4774-8f58-17b795e58c01
+# ╟─a336d60c-17a5-4961-85ac-672265666e94
+# ╟─06a284b8-ab2d-4b12-9153-5f8e88485e78
+# ╟─1f13c902-d77b-4521-829c-3502f82c438d
+# ╟─891fb287-b56b-46e1-bd7c-93eb7ca4c9ad
+# ╟─e6ec2b75-1005-4be3-aa5a-eec36550ff25
+# ╟─94ee88f4-7fbf-4725-a7a3-93268c04ad7e
