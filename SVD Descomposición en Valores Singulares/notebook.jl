@@ -490,6 +490,29 @@ end
 md"###### 👾 Versión implícita"
 
 # ╔═╡ 9a929fc1-a2b2-474a-9deb-4d8a6bc6d7d1
+"""
+Performs one Golub–Kahan SVD step on a real upper bidiagonal matrix.
+
+This function applies a single implicit QR iteration with Wilkinson shift to the 
+symmetric matrix BᵗB, where B is a real upper bidiagonal matrix represented by 
+its diagonal `d` and superdiagonal `f`.
+
+The algorithm preserves the bidiagonal structure and updates `d` and `f` in-place.
+It alternates right and left Givens rotations to propagate the bulge across the matrix.
+
+Inputs:
+- d::Vector{Float64}: the diagonal entries of B (length n)
+- f::Vector{Float64}: the superdiagonal entries of B (length n-1)
+
+Output:
+- The vectors `d` and `f` are modified in-place to reflect one step of bidiagonal SVD iteration.
+
+Note:
+- This step does not accumulate orthogonal transformations.
+- It is assumed that B has no zero entries on the diagonal or superdiagonal.
+- The algorithm is based on Golub and Van Loan, Algorithm 8.6.1.
+
+"""
 function golub_kahan_svd_step!(d::Vector{Float64}, f::Vector{Float64})
     n = length(d)
     @assert length(f) == n - 1
@@ -542,20 +565,11 @@ function golub_kahan_svd_step!(d::Vector{Float64}, f::Vector{Float64})
 end
 
 
-# ╔═╡ 9cd5e17f-721a-4b99-bd80-db95a1ef99f0
-begin
-	golub_kahan_svd_step!([4.0, 3.0, 2.0] , [1.0, 0.5])
-	golub_kahan_svd_step!([1.0, 2.0, 3.0, 4.0] , [1.0, 1.0, 0.01])
-end
+# ╔═╡ 4eb31db1-47fc-4c65-a132-2f1c23f1d05b
+golub_kahan_svd_step!([4.0, 3.0, 2.0] , [1.0, 0.5])
 
-# ╔═╡ 8065ba2c-c0ce-4cc8-87d2-e98fad2868a3
-begin
-	d = [3.0, 2.0, 1.0]
-	f = [0.5, 0.3]
-	
-	validate_golub_kahan_step(d, f)
-	
-end
+# ╔═╡ 9cd5e17f-721a-4b99-bd80-db95a1ef99f0
+golub_kahan_svd_step!([1.0, 2.0, 3.0, 4.0] , [1.0, 1.0, 0.01])
 
 # ╔═╡ 004da5d0-d039-4f0c-890b-16cdf36d21f9
 md"###### 👾 Versión explícita"
@@ -629,93 +643,95 @@ end
 
 
 # ╔═╡ 2607c879-d632-4b80-8523-123221a01303
-begin
-	golub_kahan_svd_step_matrix!(build_bidiagonal([4.0, 3.0, 2.0] , [1.0, 0.5]))
-	golub_kahan_svd_step_matrix!(build_bidiagonal([1.0, 2.0, 3.0, 4.0] , [1.0, 1.0, 0.01]))
-end
+golub_kahan_svd_step_matrix!(build_bidiagonal([4.0, 3.0, 2.0] , [1.0, 0.5]))
+
+# ╔═╡ 89f90ef4-9e8c-400c-9d6b-26e205dd1310
+golub_kahan_svd_step_matrix!(build_bidiagonal([1.0, 2.0, 3.0, 4.0] , [1.0, 1.0, 0.01]))
 
 # ╔═╡ 8ec72b94-d090-4c76-bde4-70787a67461a
-begin
-	B = build_bidiagonal([1.0, 2.0, 3.0, 4.0], [1.0, 1.0, 0.01])
-	
-	validate_golub_kahan_step(golub_kahan_svd_step_matrix!, B)
-end
+validate_golub_kahan_step(
+	golub_kahan_svd_step_matrix!, 
+	build_bidiagonal(
+		[1.0, 2.0, 3.0, 4.0], 
+		[1.0, 1.0, 0.01]
+	)
+)
 
 # ╔═╡ 5bd0c109-17c9-4e93-bdfb-e8faf660f708
 md"##### 👾 Algoritmo de Golub-Kahan"
 
 # ╔═╡ b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
 """
-Aplica el algoritmo completo de Golub–Kahan para diagonalizar una matriz bidiagonal.
+Applies the full Golub–Kahan SVD iteration (Algorithm 8.6.2) on a real upper bidiagonal matrix B.
 
-Input:
-- d: Vector{Float64} con la diagonal de la matriz bidiagonal B
-- f: Vector{Float64} con la superdiagonal de B
-- ϵ: Tolerancia (por defecto, 100×eps(Float64))
+This function repeatedly applies the Golub–Kahan SVD step with Wilkinson shift to deflate
+the superdiagonal of B until it becomes numerically zero (i.e., diagonalizes B).
+
+The bidiagonal structure is preserved, and the function modifies B in-place.
+
+Inputs:
+- B::Matrix{Float64}: square upper bidiagonal matrix (with only diagonal and superdiagonal)
+- ϵ: relative tolerance for deflation (default: 100 × eps(Float64))
 
 Output:
-- d: Diagonal actualizada (valores singulares)
-- f: Superdiagonal (debe terminar cercana a cero)
+- B is modified in-place to become diagonal (approximate singular values on the diagonal)
 """
-function golub_kahan_svd!(d::Vector{Float64}, f::Vector{Float64}; ϵ = 100 * eps(Float64))
-    n = length(d)
-    @assert length(f) == n - 1
-
-    # Ciclo externo: repetir hasta que todos los f[i] sean pequeños
+function golub_kahan_svd_matrix!(B::Matrix{Float64}; ϵ = 100 * eps(Float64))
+    n = size(B, 1)
+    @assert size(B, 2) == n "B must be square"
+    
     while true
-		display(f)
-		display(d)
-        # Paso 1: forzar ceros pequeños en f por deflación
+        # Step 1: deflation — set small superdiagonal entries to zero
         for i in 1:n-1
-            tol = ϵ * (abs(d[i]) + abs(d[i+1]))
-            if abs(f[i]) ≤ tol
-                f[i] = 0.0
+            d1 = abs(B[i, i])
+            d2 = abs(B[i+1, i+1])
+            tol = ϵ * (d1 + d2)
+            if abs(B[i, i+1]) ≤ tol
+                B[i, i+1] = 0.0
             end
         end
 
-        # Paso 2: buscar submatrices no diagonales
-        # Buscar el mayor índice q tal que f[q] ≠ 0
+        # Step 2: find the largest q such that B[q-1, q] ≠ 0
         q = n
-        while q > 1 && f[q-1] == 0.0
+        while q > 1 && B[q-1, q] == 0.0
             q -= 1
         end
 
-        # Si ya no queda banda activa, terminar
         if q == 1
-            break
+            break  # Fully diagonalized
         end
 
-        # Buscar el menor p tal que f[p] ≠ 0
+        # Step 3: find the smallest p such that B[p-1, p] == 0
         p = q - 1
-        while p > 1 && f[p-1] ≠ 0.0
+        while p > 1 && B[p-1, p] ≠ 0.0
             p -= 1
         end
 
-        # Verificar si hay ceros en la diagonal de B_{p:q}
+        # Step 4: handle zeros on the diagonal
         zero_on_diag = false
+        maxd = maximum(abs.(diag(B)))
         for i in p:q
-            if abs(d[i]) ≤ ϵ * maximum(abs.(d))
+            if abs(B[i, i]) ≤ ϵ * maxd
                 zero_on_diag = true
                 break
             end
         end
 
         if zero_on_diag
-            # Si hay ceros en la diagonal, hacer cero la fila correspondiente
             for i in p:q-1
-                if abs(d[i]) ≤ ϵ * maximum(abs.(d))
-                    f[i] = 0.0
+                if abs(B[i, i]) ≤ ϵ * maxd
+                    B[i, i+1] = 0.0
                 end
             end
-        elseif q - p + 1 >= 2
-            # Aplicar un paso QR bidiagonal al bloque activo d[p:q], f[p:q-1]
-            dblock = view(d, p:q)
-            fblock = view(f, p:q-1)
-            golub_kahan_svd_step_matrix!(build_bidiagonal(dblock, fblock))
+        elseif q - p + 1 ≥ 2
+            # Step 5: apply one Golub–Kahan step to the active block
+            Bblock = B[p:q, p:q]
+            golub_kahan_svd_step_matrix!(Bblock)
+            B[p:q, p:q] .= Bblock
         end
     end
 
-    return d
+    return B
 end
 
 
@@ -724,12 +740,83 @@ end
 	
 # Resultado: `d` contiene los valores singulares aproximados de la matriz bidiagonal
 
+# ╔═╡ b310305e-ed08-440f-8b0d-7850232f69d5
+begin
+	B = build_bidiagonal([1.0, 2.0, 3.0, 4.0], [1.0, 1.0, 0.01])
+	
+	println("Antes:")
+	display(round.(B, digits=6))
+	
+	golub_kahan_svd_matrix!(B)
+	
+	println("Después:")
+	display(round.(B, digits=6))
+	
+	println("Singular values: ", round.(diag(B), digits=8))
+	
+end
+
+# ╔═╡ b4276865-6a07-484a-9290-7d557af8ac88
+"""
+Verifica la corrección de golub_kahan_svd_matrix! sobre una matriz bidiagonal B.
+
+- B: matriz bidiagonal cuadrada (modificada in-place)
+- atol: tolerancia absoluta sobre errores espectrales y fuera de la diagonal
+- verbose: si true, imprime diferencias y estructura
+
+Retorna: true si todo está correcto, false si falla alguna validación.
+"""
+function validate_golub_kahan_svd_matrix(B::Matrix{Float64}; atol=1e-10, verbose=true)
+    n = size(B, 1)
+    @assert size(B, 2) == n "B debe ser cuadrada"
+
+    # Copia para comparar
+    B0 = copy(B)
+    λ0 = sort(eigvals(Symmetric(B0' * B0)))
+
+    # Ejecutar algoritmo
+    golub_kahan_svd_matrix!(B)
+
+    # Verificación 1: la matriz resultante debe ser diagonal (bidiagonal con superdiagonal ≈ 0)
+    is_diagonal = all(abs(B[i, j]) ≤ atol for i in 1:n, j in 1:n if i ≠ j)
+
+    # Verificación 2: los autovalores de BᵗB deben conservarse
+    λf = sort(eigvals(Symmetric(B' * B)))
+    λ_diff = norm(λ0 - λf, Inf)
+
+    # Verificación 3: valores singulares ordenados (opcional)
+    σ = sort(abs.(diag(B)), rev=true)
+
+    if verbose
+        println("✔ Diagonal final: ", is_diagonal)
+        println("✔ Autovalores iniciales: ", round.(λ0, digits=8))
+        println("✔ Autovalores finales:   ", round.(λf, digits=8))
+        println("Δλ ∞-norm: ", λ_diff)
+        println("✔ Valores singulares:    ", round.(σ, digits=8))
+    end
+
+    return is_diagonal && λ_diff ≤ atol
+end
+
+
+# ╔═╡ c756f929-8da9-41f6-aa58-6247d2a57acb
+begin
+	ok = validate_golub_kahan_svd_matrix(
+		build_bidiagonal(
+			[1.0, 2.0, 3.0, 4.0],
+			[1.0, 1.0, 0.01]
+		)
+	)
+	println("¿Validación exitosa? ", ok)
+end
+
 # ╔═╡ 00ca8f64-6937-45ee-8970-d1c2bf49fd59
 md"
 To Do:
 - [ ] Add other implementation (either classical or Jacobi)
 - [ ] Have a working Golub
-
+* - [ ] Make a verification function
+- [ ] Add or transform into a `Bidiagonal` version (does it count as implicit?)
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -799,15 +886,19 @@ version = "5.11.0+0"
 # ╟─a1c28c45-10de-460c-909f-ab724f2afd45
 # ╟─fd6ebedb-0a06-4675-adb2-7076f96fe25b
 # ╟─9a929fc1-a2b2-474a-9deb-4d8a6bc6d7d1
+# ╠═4eb31db1-47fc-4c65-a132-2f1c23f1d05b
 # ╠═9cd5e17f-721a-4b99-bd80-db95a1ef99f0
-# ╠═8065ba2c-c0ce-4cc8-87d2-e98fad2868a3
 # ╟─004da5d0-d039-4f0c-890b-16cdf36d21f9
-# ╠═adba5d98-0080-4d56-81ca-897d8a97eb39
+# ╟─adba5d98-0080-4d56-81ca-897d8a97eb39
 # ╠═2607c879-d632-4b80-8523-123221a01303
+# ╠═89f90ef4-9e8c-400c-9d6b-26e205dd1310
 # ╠═8ec72b94-d090-4c76-bde4-70787a67461a
 # ╟─5bd0c109-17c9-4e93-bdfb-e8faf660f708
-# ╠═b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
+# ╟─b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
 # ╠═7c84c4d6-27fc-4c78-9002-eeb6b8780272
+# ╠═b310305e-ed08-440f-8b0d-7850232f69d5
+# ╠═b4276865-6a07-484a-9290-7d557af8ac88
+# ╠═c756f929-8da9-41f6-aa58-6247d2a57acb
 # ╠═00ca8f64-6937-45ee-8970-d1c2bf49fd59
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
