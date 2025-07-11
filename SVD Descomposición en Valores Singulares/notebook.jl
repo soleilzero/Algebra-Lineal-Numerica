@@ -299,6 +299,104 @@ md"
 ## 🤖 Implementaciones
 "
 
+# ╔═╡ 5584e9c6-ddff-4f96-a32e-fc0a9309617a
+md"
+### Funciones auxiliares
+"
+
+# ╔═╡ 4b7d264c-0790-40a9-bf34-f7d1e31fcc41
+"""
+Analize si la matriz es ortogonal o no-
+"""
+function is_orthogonal(Q; atol=1e-12)
+    n = size(Q, 2)
+    return isapprox(Q' * Q, I(n), atol=atol)
+end
+
+
+# ╔═╡ 6cd89edb-e55f-46bf-b6b1-39b2453cdf1e
+"""
+Reconstruye la matriz original A a partir de su descomposición SVD.
+Recibe un objeto F retornado por la función svd(A).
+Devuelve A ≈ U * Σ * Vᵀ
+"""
+function reconstruct_from_svd(F)
+    m, n = size(F.U, 1), size(F.V, 1)
+    Σ = zeros(m, n)
+    for i in 1:length(F.S)
+        Σ[i, i] = F.S[i]
+    end
+    return F.U * Σ * F.V'
+end
+
+# ╔═╡ 8b67358e-800f-4bf9-8869-90b29612e51e
+struct SVDReconstruction
+    U::Matrix{Float64}
+    S::Vector{Float64}
+    V::Matrix{Float64}
+end
+
+
+# ╔═╡ beac433a-c1f4-4191-899f-6eb37d929889
+example = randn(5, 3)
+
+# ╔═╡ aab73b0c-4d6e-467e-aaf8-93d8456508bc
+md"
+### SVD nativo de Julia
+Utilizamos la función `LinearAlgebra.svd`
+"
+
+# ╔═╡ bb27217f-4d64-4e47-946d-65a4590226ea
+svd
+
+# ╔═╡ e2d4f475-165a-47dc-a4ab-1e9b1f97be3f
+md"#### Ejemplo"
+
+# ╔═╡ f2d58441-03af-4efb-9ad5-f3628511d7fa
+F1 = svd(example, full=true)
+
+# ╔═╡ c7b2ba31-3e8a-4c66-8583-d7817bf53e1b
+reconstruct_from_svd(F1)
+
+# ╔═╡ b6b0df75-1ffa-44bb-9b74-518bb918e8ab
+md"### Método ingenuo"
+
+# ╔═╡ 5655e762-fc65-48da-a4d8-9bbf0cf5e3fc
+"""
+Calcula la SVD de A utilizando el enfoque clásico basado en formar C = AᵀA.
+Paso 1: Formar C = AᵀA
+Paso 2: Calcular la descomposición espectral de C = VΛVᵀ usando QR simétrico
+Paso 3: Calcular AV = QR para obtener U
+Devuelve U, Σ, Vᵀ
+"""
+function svd_via_ata(A::Matrix{Float64})
+    m, n = size(A)
+
+    # Step 1: Form the symmetric matrix C = AᵀA
+    C = A' * A
+
+    # Step 2: Compute eigen-decomposition of C = VΛVᵀ
+    # This corresponds to applying the symmetric QR algorithm to C
+    quadratic_eigenvalues, V = eigen(Symmetric(C))
+    eigenvalues = sqrt.(clamp.(quadratic_eigenvalues, 0.0, Inf))
+
+    # Step 3: Compute AV = QR to obtain U
+    AV = A * V
+    Q, _ = qr(AV)  # QR
+    U = collect(Q) # Get full Q
+
+    return SVDReconstruction(U, eigenvalues, V)
+end
+
+# ╔═╡ 59f9f7e8-f355-40a3-94e0-5cb3c6dec15d
+md"#### Ejemplo "
+
+# ╔═╡ 40a0849e-6ad5-4b70-b708-5cb1d92ed578
+F2 = svd_via_ata(example)
+
+# ╔═╡ 6363a2cf-a7bf-475b-8f9c-0de2c5c66697
+reconstruct_from_svd(F2)
+
 # ╔═╡ 247c0f32-0141-424f-9e8d-6dda19a521db
 md"""
 #### Método de Golub–Kahan
@@ -734,7 +832,8 @@ end
 
 
 # ╔═╡ cb27deb4-cefa-4d34-b29f-be8fd219035d
-begin
+md"""begin
+	
 	# Matriz de prueba
 	A = randn(6, 4)
 	
@@ -749,15 +848,18 @@ begin
 	println("σ (referencia)   = ", round.(σ_ref, digits=6))
 	println("Error absoluto    = ", round.(maximum(abs.(σ .- σ_ref)), digits=6))
 	
-end
+end"""
 
 # ╔═╡ 00ca8f64-6937-45ee-8970-d1c2bf49fd59
 md"
 ## To Do:
 - [X] Have a working Golub
+* - [ ] Full algorithm (From initial Householder)
 * - [x] Make a verification function
+* - [ ] How to get the SVD from the result?
 - [ ] Add or transform into a `Bidiagonal` version (does it count as implicit?)
-- [ ] Add other implementation (either classical or Jacobi)
+- [X] Add other implementation (either classical or Jacobi)
+     -> Comparar con versión INGENUA, no clásica.
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -813,6 +915,21 @@ version = "5.11.0+0"
 # ╟─85c6df45-20ef-4db2-8703-ddf76166832e
 # ╟─74470dd1-eb43-4039-9d93-6bdf32768466
 # ╟─c0b961d8-3400-4d21-a6ba-3953f48accd8
+# ╟─5584e9c6-ddff-4f96-a32e-fc0a9309617a
+# ╟─4b7d264c-0790-40a9-bf34-f7d1e31fcc41
+# ╠═6cd89edb-e55f-46bf-b6b1-39b2453cdf1e
+# ╠═8b67358e-800f-4bf9-8869-90b29612e51e
+# ╠═beac433a-c1f4-4191-899f-6eb37d929889
+# ╟─aab73b0c-4d6e-467e-aaf8-93d8456508bc
+# ╠═bb27217f-4d64-4e47-946d-65a4590226ea
+# ╟─e2d4f475-165a-47dc-a4ab-1e9b1f97be3f
+# ╠═f2d58441-03af-4efb-9ad5-f3628511d7fa
+# ╠═c7b2ba31-3e8a-4c66-8583-d7817bf53e1b
+# ╟─b6b0df75-1ffa-44bb-9b74-518bb918e8ab
+# ╠═5655e762-fc65-48da-a4d8-9bbf0cf5e3fc
+# ╟─59f9f7e8-f355-40a3-94e0-5cb3c6dec15d
+# ╠═40a0849e-6ad5-4b70-b708-5cb1d92ed578
+# ╠═6363a2cf-a7bf-475b-8f9c-0de2c5c66697
 # ╟─247c0f32-0141-424f-9e8d-6dda19a521db
 # ╟─ab104798-39bf-44cb-ad07-9d5592524730
 # ╟─c2105a86-9dda-4ccb-a9df-cba3c10b6161
