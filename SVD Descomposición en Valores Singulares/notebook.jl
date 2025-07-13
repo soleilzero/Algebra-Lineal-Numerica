@@ -304,11 +304,32 @@ md"
 ### Funciones auxiliares
 "
 
+# ╔═╡ a8f52599-0132-4cd7-b665-8d44fd8d2d52
+"""
+Verifica si una matriz B es bidiagonal superior dentro de una tolerancia `atol`.
+
+Devuelve `true` si cumple, `false` si no.
+"""
+function is_bidiagonal(B::AbstractMatrix{<:Real}; atol=1e-12)
+    m, n = size(B)
+    for i in 1:m
+        for j in 1:n
+            if j != i && j != i+1
+                if abs(B[i,j]) > atol
+                    return false
+                end
+            end
+        end
+    end
+    return true
+end
+
+
 # ╔═╡ 4b7d264c-0790-40a9-bf34-f7d1e31fcc41
 """
-Analize si la matriz es ortogonal o no-
+Analiza si la matriz es ortogonal o no.
 """
-function is_orthogonal(Q; atol=1e-12)
+function is_orthogonal(Q::AbstractMatrix{<:Real}; atol=1e-12)
     n = size(Q, 2)
     return isapprox(Q' * Q, I(n), atol=atol)
 end
@@ -353,7 +374,7 @@ end
 
 
 # ╔═╡ beac433a-c1f4-4191-899f-6eb37d929889
-example = randn(5, 3)
+example = randn(5, 4)
 
 # ╔═╡ aab73b0c-4d6e-467e-aaf8-93d8456508bc
 md"
@@ -424,10 +445,6 @@ md"""
 #### Funciones auxiliares
 """
 
-# ╔═╡ 311a1fdd-e0cc-413a-81c5-262e29a1132b
-md"
-#### Paso de Golub-Kahan"
-
 # ╔═╡ d5e98c9e-92ee-454d-9de8-7c5f38e89c68
 """
 Calcula el shift de Wilkinson (mu) a partir de los tres elementos finales de B bidiagonal.
@@ -472,6 +489,188 @@ function givens_rotation(y::Float64, z::Float64)
 end
 
 
+# ╔═╡ c2105a86-9dda-4ccb-a9df-cba3c10b6161
+"""
+Construye una matriz bidiagonal superior B ∈ ℝ^{n×n} a partir de:
+
+- d: diagonal de B, longitud n
+- f: superdiagonal de B, longitud n - 1
+
+Retorna: B :: Matrix{Float64}, una matriz n×n con estructura bidiagonal superior.
+"""
+function build_bidiagonal(d, f)
+    n = length(d)
+    @assert length(f) == n - 1 "La superdiagonal f debe tener longitud n - 1"
+
+    B = zeros(Float64, n, n)
+
+    for i in 1:n
+        B[i, i] = d[i]
+        if i < n
+            B[i, i+1] = f[i]
+        end
+    end
+
+    return B
+end
+
+
+# ╔═╡ cfa62a92-828e-4510-81ae-985e84e2250e
+"""
+Fuerza a cero los elementos de la matriz B que están fuera de la banda bidiagonal,
+si su magnitud es menor que un umbral dado (por defecto 1e-14).
+Esto es útil para limpiar errores numéricos tras la bidiagonalización.
+
+Modifica B in-place.
+"""
+function force_bidiagonal!(B::Matrix{Float64}; atol=1e-14)
+    m, n = size(B)
+    for i in 1:m
+        for j in 1:n
+            if j != i && j != i+1 && abs(B[i,j]) < atol
+                B[i,j] = 0.0
+            end
+        end
+    end
+end
+
+
+# ╔═╡ 8ca30862-249a-444d-8a79-702ec8732935
+"""
+Compara `wilkinson_shift` con el verdadero autovalor de una matriz 2x2 para validar.
+"""
+function validate_shift(dm, fm, dn)
+    T = [
+        dm^2 + fm^2    fm * dn
+        fm * dn        dn^2
+    ]
+    λ = eigen(T).values
+    μ_ref = λ[argmin(abs.(λ .- dn^2))]  # autovalor más cercano a t_nn
+    μ_custom = wilkinson_shift(dm, fm, dn)
+    
+    println("μ (eigen 2×2)     = $μ_ref")
+    println("μ (Wilkinson calc)= $μ_custom")
+    println("Error             = $(abs(μ_custom - μ_ref))")
+end
+
+
+# ╔═╡ 311a1fdd-e0cc-413a-81c5-262e29a1132b
+md"
+#### Paso de Golub-Kahan"
+
+# ╔═╡ e344fe0e-b939-4163-84ac-01c402895e38
+md"#### Diagonalización"
+
+# ╔═╡ 3069c786-0823-42a0-92c0-4df61174e5d1
+md"
+Podemos ver que los autovalores parecen conservarse en las validaciones de `golub_kahan_svd_step_matrix` y `golub_kahan_svd_matrix`. Sin embargo la norma del error es demasiado grande. Esto nos dice que no es un problema de la lógica del algoritmo, sino de su implementación.
+Por esto, creemos otra implementación que utilice la matriz bidiagonal de manera implícita.
+"
+
+# ╔═╡ 8b74dc98-40e2-4a55-b98c-363910221ed4
+md"#### Alternativa implícita"
+
+# ╔═╡ 04eb9c27-8a4f-462e-930a-4f643d424769
+md"#### Algoritmo de Golub Kahan"
+
+# ╔═╡ 4e69684e-b6bb-439a-a8c7-3a65ebb36f25
+"""
+Reduce la matriz A a forma bidiagonal utilizando reflexiones de Householder.
+Devuelve la matriz bidiagonal B, y las matrices ortogonales U y V tal que A ≈ U * B * Vᵀ.
+"""
+function bidiagonalize_householder(A::Matrix{Float64})
+    m, n = size(A)
+    B = copy(A)
+    U = Matrix{Float64}(I, m, m)
+    V = Matrix{Float64}(I, n, n)
+
+    for i in 1:min(m, n)
+        # Reflexión de Householder desde la izquierda (columnas)
+        x = B[i:end, i]
+        v = copy(x)
+        v[1] += sign(x[1]) * norm(x)
+        v = v / norm(v)
+        B[i:end, i:end] -= 2 * v * (v' * B[i:end, i:end])
+        U[:, i:end] -= 2 * (U[:, i:end] * v) * v'
+
+        if i < n
+            # Reflexión de Householder desde la derecha (filas)
+            x = B[i, i+1:end]'
+            v = copy(x)
+            v[1] += sign(x[1]) * norm(x)
+            v = v / norm(v)
+            B[i:end, i+1:end] -= 2 * (B[i:end, i+1:end] * v') * v
+            V[:, i+1:end] -= 2 * (V[:, i+1:end] * v') * v
+        end
+    end
+
+    return B, U, V
+end
+
+
+# ╔═╡ 8138c8bb-ca12-492c-9e78-f88c692f9538
+begin
+	square_bidiagonal_example = bidiagonalize_householder(randn(5, 5))[1]
+	force_bidiagonal!(square_bidiagonal_example)
+end
+
+# ╔═╡ c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
+begin
+	Y = randn(5, 3)
+	B, U, V = bidiagonalize_householder(Y)
+	A_hat = U * B * V'
+	println("Error de reconstrucción: ", norm(Y - A_hat))
+	
+end
+
+# ╔═╡ d8888165-0100-4c40-8bd1-0182f91e3565
+begin
+	
+	function is_bidiagonal(B; atol=1e-12)
+	    m, n = size(B)
+	    for i in 1:m
+	        for j in 1:n
+	            if (j != i && j != i+1) && abs(B[i,j]) > atol
+	                return false
+	            end
+	        end
+	    end
+	    return true
+	end
+	
+	@show is_bidiagonal(B)
+end
+
+# ╔═╡ 6c502074-cfa6-4d7d-8754-b4114743aaeb
+md"#### Ejemplo y validación"
+
+# ╔═╡ ab104798-39bf-44cb-ad07-9d5592524730
+md" ### Funciones auxiliares extra"
+
+# ╔═╡ d79631a6-4494-49bd-a9e5-8b100de0272d
+"""
+Aplica rotación de Givens por la derecha sobre d[k] y f[k]
+"""
+function apply_right_rotation!(d, f, k::Int, c::Float64, s::Float64)
+    d_k  = d[k]
+    f_k  = f[k]
+    d[k] =  c * d_k + s * f_k
+    f[k] = -s * d_k + c * f_k
+end
+
+
+# ╔═╡ 2edc23a7-b981-4416-8516-54084054bd74
+"""
+Aplica rotación de Givens por la izquierda sobre d[k] y d[k+1]
+"""
+function apply_left_rotation!(d, k::Int, c::Float64, s::Float64)
+    d_k  = d[k]
+    d_k1 = d[k+1]
+    d[k]   =  c * d_k + s * d_k1
+    d[k+1] = -s * d_k + c * d_k1
+end
+
+
 # ╔═╡ adba5d98-0080-4d56-81ca-897d8a97eb39
 """
 Aplica un paso QR bidiagonal de Golub–Kahan a una matriz bidiagonal superior B ∈ ℝ^{n×n}.
@@ -511,14 +710,7 @@ function golub_kahan_svd_step_matrix!(B::Matrix{Float64})
         y = B[k, k]
         z = B[k+1, k]
         c, s, _ = givens_rotation(y, z)
-
-        # Solo filas k y k+1 de columnas k y siguientes
-        for j in k:n
-            t1 = B[k, j]
-            t2 = B[k+1, j]
-            B[k, j]   =  c * t1 + s * t2
-            B[k+1, j] = -s * t1 + c * t2
-        end
+		apply_left_rotation!(B, k, c, s)
 
         # Preparar vector (y, z) para la próxima rotación por la derecha
         if k < n - 1
@@ -527,125 +719,11 @@ function golub_kahan_svd_step_matrix!(B::Matrix{Float64})
         end
     end
 
-    # Limpiar numéricamente la matriz fuera de la banda bidiagonal
-    for i in 1:n
-        for j in 1:n
-            if j ≠ i && j ≠ i+1
-                B[i, j] = 0.0
-            end
-        end
-    end
+    force_bidiagonal!(B)
 
     return B
 end
 
-
-# ╔═╡ 7f39475d-a3c9-4c5c-8a55-aa2ba34d6289
-md"##### Validación"
-
-
-# ╔═╡ c2105a86-9dda-4ccb-a9df-cba3c10b6161
-"""
-Construye una matriz bidiagonal superior B ∈ ℝ^{n×n} a partir de:
-
-- d: diagonal de B, longitud n
-- f: superdiagonal de B, longitud n - 1
-
-Retorna: B :: Matrix{Float64}, una matriz n×n con estructura bidiagonal superior.
-"""
-function build_bidiagonal(d, f)
-    n = length(d)
-    @assert length(f) == n - 1 "La superdiagonal f debe tener longitud n - 1"
-
-    B = zeros(Float64, n, n)
-
-    for i in 1:n
-        B[i, i] = d[i]
-        if i < n
-            B[i, i+1] = f[i]
-        end
-    end
-
-    return B
-end
-
-
-# ╔═╡ 8ca30862-249a-444d-8a79-702ec8732935
-"""
-Compara `wilkinson_shift` con el verdadero autovalor de una matriz 2x2 para validar.
-"""
-function validate_shift(dm, fm, dn)
-    T = [
-        dm^2 + fm^2    fm * dn
-        fm * dn        dn^2
-    ]
-    λ = eigen(T).values
-    μ_ref = λ[argmin(abs.(λ .- dn^2))]  # autovalor más cercano a t_nn
-    μ_custom = wilkinson_shift(dm, fm, dn)
-    
-    println("μ (eigen 2×2)     = $μ_ref")
-    println("μ (Wilkinson calc)= $μ_custom")
-    println("Error             = $(abs(μ_custom - μ_ref))")
-end
-
-
-# ╔═╡ a1c28c45-10de-460c-909f-ab724f2afd45
-"""
-Valida un paso de Golub–Kahan aplicado a una matriz bidiagonal B.
-
-- step_func: función que modifica B in-place (como golub_kahan_svd_step_matrix!)
-- B: matriz bidiagonal cuadrada (con solo diagonal y superdiagonal)
-
-Opcional:
-- verbose = true: imprime detalles
-- atol: tolerancia para comparar autovalores
-
-Retorna: true si todo pasa, false si falla alguna prueba.
-"""
-function validate_golub_kahan_step(step_func::Function, B::Matrix{Float64};
-                                   atol=1e-10, verbose=true)
-    n = size(B, 1)
-    @assert size(B, 2) == n "B debe ser cuadrada"
-
-    # --- Copiar datos originales ---
-    B_before = copy(B)
-    T_before = B_before' * B_before
-    λ_before = sort(eigvals(Symmetric(T_before)))
-
-    # --- Aplicar paso QR bidiagonal ---
-    step_func(B)
-
-    # --- Verificar estructura bidiagonal ---
-    is_bidiagonal = all(i == j || j == i+1 || B[i, j] == 0.0 for i in 1:n, j in 1:n)
-
-    # --- Comparar autovalores ---
-    T_after = B' * B
-    λ_after = sort(eigvals(Symmetric(T_after)))
-    λ_diff = norm(λ_before - λ_after, Inf)
-
-    # --- Imprimir si se desea ---
-    if verbose
-        println("✔ Estructura bidiagonal: ", is_bidiagonal)
-        println("✔ Autovalores antes:  ", round.(λ_before, digits=8))
-        println("✔ Autovalores después:", round.(λ_after, digits=8))
-        println("Δλ ∞-norm: ", λ_diff)
-    end
-
-    return is_bidiagonal && λ_diff ≤ atol
-end
-
-
-# ╔═╡ 8ec72b94-d090-4c76-bde4-70787a67461a
-validate_golub_kahan_step(
-	golub_kahan_svd_step_matrix!, 
-	build_bidiagonal(
-		[1.0, 2.0, 3.0, 4.0], 
-		[1.0, 1.0, 0.01]
-	)
-)
-
-# ╔═╡ e344fe0e-b939-4163-84ac-01c402895e38
-md"#### Diagonalización"
 
 # ╔═╡ b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
 """
@@ -722,151 +800,6 @@ function golub_kahan_svd_matrix!(B::Matrix{Float64}; ϵ = 100 * eps(Float64))
 end
 
 
-# ╔═╡ 502c0650-1925-4174-8c8e-dd963728c7b2
-md"##### Validación"
-
-# ╔═╡ b4276865-6a07-484a-9290-7d557af8ac88
-"""
-Verifica la corrección de golub_kahan_svd_matrix! sobre una matriz bidiagonal B.
-
-- B: matriz bidiagonal cuadrada (modificada in-place)
-- atol: tolerancia absoluta sobre errores espectrales y fuera de la diagonal
-- verbose: si true, imprime diferencias y estructura
-
-Retorna: true si todo está correcto, false si falla alguna validación.
-"""
-function validate_golub_kahan_svd_matrix(B::Matrix{Float64}; atol=1e-10, verbose=true)
-    n = size(B, 1)
-    @assert size(B, 2) == n "B debe ser cuadrada"
-
-    # Copia para comparar
-    B0 = copy(B)
-    λ0 = sort(eigvals(Symmetric(B0' * B0)))
-
-    # Ejecutar algoritmo
-    golub_kahan_svd_matrix!(B)
-
-    # Verificación 1: la matriz resultante debe ser diagonal (bidiagonal con superdiagonal ≈ 0)
-    is_diagonal = all(abs(B[i, j]) ≤ atol for i in 1:n, j in 1:n if i ≠ j)
-
-    # Verificación 2: los autovalores de BᵗB deben conservarse
-    λf = sort(eigvals(Symmetric(B' * B)))
-    λ_diff = norm(λ0 - λf, Inf)
-
-    # Verificación 3: valores singulares ordenados (opcional)
-    σ = sort(abs.(diag(B)), rev=true)
-
-    if verbose
-        println("✔ Diagonal final: ", is_diagonal)
-        println("✔ Autovalores iniciales: ", round.(λ0, digits=8))
-        println("✔ Autovalores finales:   ", round.(λf, digits=8))
-        println("Δλ ∞-norm: ", λ_diff)
-        println("✔ Valores singulares:    ", round.(σ, digits=8))
-    end
-
-    return is_diagonal && λ_diff ≤ atol
-end
-
-
-# ╔═╡ c756f929-8da9-41f6-aa58-6247d2a57acb
-validate_golub_kahan_svd_matrix(
-	build_bidiagonal(
-		[1.0, 2.0, 3.0, 4.0],
-		[1.0, 1.0, 0.01]
-	)
-)
-
-# ╔═╡ 3069c786-0823-42a0-92c0-4df61174e5d1
-md"
-Podemos ver que los autovalores parecen conservarse en las validaciones de `golub_kahan_svd_step_matrix` y `golub_kahan_svd_matrix`. Sin embargo la norma del error es demasiado grande. Esto nos dice que no es un problema de la lógica del algoritmo, sino de su implementación.
-Por esto, creemos otra implementación que utilice la matriz bidiagonal de manera implícita.
-"
-
-# ╔═╡ 04eb9c27-8a4f-462e-930a-4f643d424769
-md"#### Algoritmo de Golub Kahan"
-
-# ╔═╡ 4e69684e-b6bb-439a-a8c7-3a65ebb36f25
-"""
-Reduce la matriz A a forma bidiagonal utilizando reflexiones de Householder.
-Devuelve la matriz bidiagonal B, y las matrices ortogonales U y V tal que A ≈ U * B * Vᵀ.
-"""
-function bidiagonalize_householder(A::Matrix{Float64})
-    m, n = size(A)
-    B = copy(A)
-    U = Matrix{Float64}(I, m, m)
-    V = Matrix{Float64}(I, n, n)
-
-    for i in 1:min(m, n)
-        # Reflexión de Householder desde la izquierda (columnas)
-        x = B[i:end, i]
-        v = copy(x)
-        v[1] += sign(x[1]) * norm(x)
-        v = v / norm(v)
-        B[i:end, i:end] -= 2 * v * (v' * B[i:end, i:end])
-        U[:, i:end] -= 2 * (U[:, i:end] * v) * v'
-
-        if i < n
-            # Reflexión de Householder desde la derecha (filas)
-            x = B[i, i+1:end]'
-            v = copy(x)
-            v[1] += sign(x[1]) * norm(x)
-            v = v / norm(v)
-            B[i:end, i+1:end] -= 2 * (B[i:end, i+1:end] * v') * v
-            V[:, i+1:end] -= 2 * (V[:, i+1:end] * v') * v
-        end
-    end
-
-    return B, U, V
-end
-
-
-# ╔═╡ cfa62a92-828e-4510-81ae-985e84e2250e
-"""
-Fuerza a cero los elementos de la matriz B que están fuera de la banda bidiagonal,
-si su magnitud es menor que un umbral dado (por defecto 1e-14).
-Esto es útil para limpiar errores numéricos tras la bidiagonalización.
-
-Modifica B in-place.
-"""
-function force_bidiagonal!(B::Matrix{Float64}; atol=1e-14)
-    m, n = size(B)
-    for i in 1:m
-        for j in 1:n
-            if j != i && j != i+1 && abs(B[i,j]) < atol
-                B[i,j] = 0.0
-            end
-        end
-    end
-end
-
-
-# ╔═╡ c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
-begin
-	Y = randn(5, 3)
-	B, U, V = bidiagonalize_householder(Y)
-	A_hat = U * B * V'
-	println("Error de reconstrucción: ", norm(Y - A_hat))
-	
-end
-
-# ╔═╡ d8888165-0100-4c40-8bd1-0182f91e3565
-begin
-	
-	function is_bidiagonal(B; atol=1e-12)
-	    m, n = size(B)
-	    for i in 1:m
-	        for j in 1:n
-	            if (j != i && j != i+1) && abs(B[i,j]) > atol
-	                return false
-	            end
-	        end
-	    end
-	    return true
-	end
-	
-	@show is_bidiagonal(B)
-end
-
 # ╔═╡ 65aa59c8-586f-4850-875c-7a19ed968882
 """
 Calcula la SVD de una matriz A ∈ ℝ^{m×n} utilizando el algoritmo de Golub-Kahan.
@@ -890,9 +823,6 @@ function svd_golub_kahan(A::Matrix{Float64}; tol=1e-12, maxiter=1000)
 end
 
 
-# ╔═╡ 6c502074-cfa6-4d7d-8754-b4114743aaeb
-md"#### Ejemplo y validación"
-
 # ╔═╡ 537968ea-5d8c-4adc-9f36-d229e21d4085
 begin
 	F3 = svd_golub_kahan(example)
@@ -902,32 +832,99 @@ end
 # ╔═╡ 4f81f155-f5c7-42f2-8e10-af8ae8ad1dae
 A_reconstructed = reconstruct_from_svd(F3)
 
-# ╔═╡ ab104798-39bf-44cb-ad07-9d5592524730
-md" ### Funciones auxiliares extra"
+# ╔═╡ 56c579f8-939f-445a-aae2-098e944c56f7
+"""
+Aplica un paso Golub–Kahan a vectores bidiagonales d y f in-place.
+Modifica directamente los vectores d y f.
+"""
+function golub_kahan_svd_step_vector!(d::Vector{Float64}, f::Vector{Float64})
+    n = length(d)
+    @assert length(f) == n - 1 "Longitud de f debe ser n-1"
 
-# ╔═╡ d79631a6-4494-49bd-a9e5-8b100de0272d
-"""
-Aplica rotación de Givens por la derecha sobre d[k] y f[k]
-"""
-function apply_right_rotation!(d, f, k::Int, c::Float64, s::Float64)
-    d_k  = d[k]
-    f_k  = f[k]
-    d[k] =  c * d_k + s * f_k
-    f[k] = -s * d_k + c * f_k
+    # Calcular shift de Wilkinson
+    μ = wilkinson_shift(d[end-1], f[end], d[end])
+
+    # Vector inicial (y, z) para la primera rotación
+    y = d[1]^2 - μ
+    z = d[1] * f[1]
+
+    for k in 1:n-1
+        # Rotación por la derecha
+        c, s = givens_rotation(y, z)
+        apply_right_rotation!(d, f, k, c, s)
+
+        # Rotación por la izquierda
+        c, s = givens_rotation(d[k], d[k+1])
+        apply_left_rotation!(d, k, c, s)
+
+        # Preparar siguiente (y, z)
+        if k < n - 1
+            y = f[k]
+            z = f[k+1]
+        end
+    end
 end
 
 
-# ╔═╡ 2edc23a7-b981-4416-8516-54084054bd74
+# ╔═╡ 09168c5e-1192-41cd-a610-2152a688d90f
 """
-Aplica rotación de Givens por la izquierda sobre d[k] y d[k+1]
+Valida un paso o una iteración completa del algoritmo de Golub–Kahan.
+
+Recibe:
+- B0: una matriz bidiagonal cuadrada (o vectores d, f)
+- método::Symbol: :step_matrix, :matrix, o :step_vector
+Aplica la transformación y reporta:
+- Si se mantiene la bidiagonalidad
+- Si se reduce la superdiagonal
+- Si se conserva la norma de BᵗB
 """
-function apply_left_rotation!(d, k::Int, c::Float64, s::Float64)
-    d_k  = d[k]
-    d_k1 = d[k+1]
-    d[k]   =  c * d_k + s * d_k1
-    d[k+1] = -s * d_k + c * d_k1
+function validate_bidiagonal_svd_step(B0::Matrix{Float64}, método::Symbol)
+    B = copy(B0)
+    n = size(B, 1)
+    @assert size(B,2) == n "B debe ser cuadrada"
+
+    A0 = B' * B
+	λ0 = eigen(Symmetric(A0)).values
+    f_before = [B[i, i+1] for i in 1:n-1]
+
+    if método == :step_matrix
+        golub_kahan_svd_step_matrix!(B)
+
+    elseif método == :matrix
+        golub_kahan_svd_matrix!(B)
+
+    elseif método == :step_vector
+        d = diag(B)
+        f = [B[i, i+1] for i in 1:n-1]
+        golub_kahan_svd_step_vector!(d, f)
+        B .= build_bidiagonal(d, f)  # reconstruir B
+
+    else
+        error("Método no reconocido: $método")
+    end
+
+    A1 = B' * B
+	λ1 = eigen(Symmetric(A1)).values
+    f_after = [B[i, i+1] for i in 1:n-1]	
+
+	println("Método: ", método)
+    println("¿Ahora es bidiagonal?: ", is_bidiagonal(B))
+    println("Reducción superdiagonal: ", norm(f_before) > norm(f_after))
+    println("‖BᵗB‖₂ antes: ", norm(A0), " — después: ", norm(A1))
+    println("‖BᵗB - nuevo‖: ", norm(A1 - A0))
+	println("Diferencia en autovalores de BᵗB: ", norm(sort(λ0) - sort(λ1)))
+	println("")
+
 end
 
+
+# ╔═╡ 13f39950-32d3-428f-a33b-71dae23be7ac
+begin
+	println("Estado")
+	validate_bidiagonal_svd_step(square_bidiagonal_example,:step_matrix)
+	validate_bidiagonal_svd_step(square_bidiagonal_example,:matrix)
+	validate_bidiagonal_svd_step(square_bidiagonal_example,:step_vector)
+end
 
 # ╔═╡ a48dea5f-3e17-45d2-9a07-7eb0228ca516
 """
@@ -1035,12 +1032,12 @@ end"""
 # ╔═╡ 00ca8f64-6937-45ee-8970-d1c2bf49fd59
 md"
 ## To Do:
-- [X] Have a working Golub
+- [ ] Use general verification function
+- [ ] Fix golub_kahan_svd_step_matrix, golub_kahan_svd_matrix golub_kahan_svd_step_vector
+- [ ] Have a working Golub
 * - [ ] Full algorithm (From initial Householder)
-* - [x] Make a verification function
 * - [ ] How to get the SVD from the result?
 - [ ] Add or transform into a `Bidiagonal` version (does it count as implicit?)
-- [X] Add other implementation (either classical or Jacobi)
      -> Comparar con versión INGENUA, no clásica.
 "
 
@@ -1098,11 +1095,13 @@ version = "5.11.0+0"
 # ╟─74470dd1-eb43-4039-9d93-6bdf32768466
 # ╟─c0b961d8-3400-4d21-a6ba-3953f48accd8
 # ╟─5584e9c6-ddff-4f96-a32e-fc0a9309617a
+# ╟─a8f52599-0132-4cd7-b665-8d44fd8d2d52
 # ╟─4b7d264c-0790-40a9-bf34-f7d1e31fcc41
 # ╟─6cd89edb-e55f-46bf-b6b1-39b2453cdf1e
 # ╟─ea4159af-a82d-40b2-ace2-c689aaeecd0d
 # ╠═8b67358e-800f-4bf9-8869-90b29612e51e
 # ╠═beac433a-c1f4-4191-899f-6eb37d929889
+# ╠═8138c8bb-ca12-492c-9e78-f88c692f9538
 # ╟─aab73b0c-4d6e-467e-aaf8-93d8456508bc
 # ╟─bb27217f-4d64-4e47-946d-65a4590226ea
 # ╟─e2d4f475-165a-47dc-a4ab-1e9b1f97be3f
@@ -1119,23 +1118,21 @@ version = "5.11.0+0"
 # ╟─d5e98c9e-92ee-454d-9de8-7c5f38e89c68
 # ╟─7902449e-e1ca-4dd7-aef1-96d32e051f40
 # ╟─c2105a86-9dda-4ccb-a9df-cba3c10b6161
+# ╟─cfa62a92-828e-4510-81ae-985e84e2250e
 # ╟─8ca30862-249a-444d-8a79-702ec8732935
+# ╟─09168c5e-1192-41cd-a610-2152a688d90f
+# ╠═13f39950-32d3-428f-a33b-71dae23be7ac
+# ╟─3069c786-0823-42a0-92c0-4df61174e5d1
 # ╟─311a1fdd-e0cc-413a-81c5-262e29a1132b
 # ╠═adba5d98-0080-4d56-81ca-897d8a97eb39
-# ╟─7f39475d-a3c9-4c5c-8a55-aa2ba34d6289
-# ╟─a1c28c45-10de-460c-909f-ab724f2afd45
-# ╠═8ec72b94-d090-4c76-bde4-70787a67461a
 # ╟─e344fe0e-b939-4163-84ac-01c402895e38
 # ╟─b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
-# ╟─502c0650-1925-4174-8c8e-dd963728c7b2
-# ╟─b4276865-6a07-484a-9290-7d557af8ac88
-# ╠═c756f929-8da9-41f6-aa58-6247d2a57acb
-# ╟─3069c786-0823-42a0-92c0-4df61174e5d1
+# ╟─8b74dc98-40e2-4a55-b98c-363910221ed4
+# ╠═56c579f8-939f-445a-aae2-098e944c56f7
 # ╟─04eb9c27-8a4f-462e-930a-4f643d424769
 # ╟─4e69684e-b6bb-439a-a8c7-3a65ebb36f25
-# ╟─cfa62a92-828e-4510-81ae-985e84e2250e
-# ╟─c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
-# ╟─d8888165-0100-4c40-8bd1-0182f91e3565
+# ╠═c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
+# ╠═d8888165-0100-4c40-8bd1-0182f91e3565
 # ╟─a48dea5f-3e17-45d2-9a07-7eb0228ca516
 # ╟─65aa59c8-586f-4850-875c-7a19ed968882
 # ╟─6c502074-cfa6-4d7d-8754-b4114743aaeb
@@ -1149,6 +1146,6 @@ version = "5.11.0+0"
 # ╟─277c10ee-bd03-4efe-b54b-0d835a8781a0
 # ╟─9a929fc1-a2b2-474a-9deb-4d8a6bc6d7d1
 # ╟─cb27deb4-cefa-4d34-b29f-be8fd219035d
-# ╟─00ca8f64-6937-45ee-8970-d1c2bf49fd59
+# ╠═00ca8f64-6937-45ee-8970-d1c2bf49fd59
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
