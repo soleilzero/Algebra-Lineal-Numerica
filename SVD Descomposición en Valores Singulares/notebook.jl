@@ -489,6 +489,9 @@ function givens_rotation(y::Float64, z::Float64)
 end
 
 
+# ╔═╡ 32c6c09f-c6e5-476e-b15a-6c5de2db0423
+
+
 # ╔═╡ c2105a86-9dda-4ccb-a9df-cba3c10b6161
 """
 Construye una matriz bidiagonal superior B ∈ ℝ^{n×n} a partir de:
@@ -554,122 +557,15 @@ function validate_shift(dm, fm, dn)
 end
 
 
-# ╔═╡ 311a1fdd-e0cc-413a-81c5-262e29a1132b
-md"
-#### Paso de Golub-Kahan"
-
-# ╔═╡ e344fe0e-b939-4163-84ac-01c402895e38
-md"#### Diagonalización"
-
 # ╔═╡ 3069c786-0823-42a0-92c0-4df61174e5d1
 md"
 Podemos ver que los autovalores parecen conservarse en las validaciones de `golub_kahan_svd_step_matrix` y `golub_kahan_svd_matrix`. Sin embargo la norma del error es demasiado grande. Esto nos dice que no es un problema de la lógica del algoritmo, sino de su implementación.
 Por esto, creemos otra implementación que utilice la matriz bidiagonal de manera implícita.
 "
 
-# ╔═╡ 8b74dc98-40e2-4a55-b98c-363910221ed4
-md"#### Alternativa implícita"
-
-# ╔═╡ 04eb9c27-8a4f-462e-930a-4f643d424769
-md"#### Algoritmo de Golub Kahan"
-
-# ╔═╡ 4e69684e-b6bb-439a-a8c7-3a65ebb36f25
-"""
-Reduce la matriz A a forma bidiagonal utilizando reflexiones de Householder.
-Devuelve la matriz bidiagonal B, y las matrices ortogonales U y V tal que A ≈ U * B * Vᵀ.
-"""
-function bidiagonalize_householder(A::Matrix{Float64})
-    m, n = size(A)
-    B = copy(A)
-    U = Matrix{Float64}(I, m, m)
-    V = Matrix{Float64}(I, n, n)
-
-    for i in 1:min(m, n)
-        # Reflexión de Householder desde la izquierda (columnas)
-        x = B[i:end, i]
-        v = copy(x)
-        v[1] += sign(x[1]) * norm(x)
-        v = v / norm(v)
-        B[i:end, i:end] -= 2 * v * (v' * B[i:end, i:end])
-        U[:, i:end] -= 2 * (U[:, i:end] * v) * v'
-
-        if i < n
-            # Reflexión de Householder desde la derecha (filas)
-            x = B[i, i+1:end]'
-            v = copy(x)
-            v[1] += sign(x[1]) * norm(x)
-            v = v / norm(v)
-            B[i:end, i+1:end] -= 2 * (B[i:end, i+1:end] * v') * v
-            V[:, i+1:end] -= 2 * (V[:, i+1:end] * v') * v
-        end
-    end
-
-    return B, U, V
-end
-
-
-# ╔═╡ 8138c8bb-ca12-492c-9e78-f88c692f9538
-begin
-	square_bidiagonal_example = bidiagonalize_householder(randn(5, 5))[1]
-	force_bidiagonal!(square_bidiagonal_example)
-end
-
-# ╔═╡ c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
-begin
-	Y = randn(5, 3)
-	B, U, V = bidiagonalize_householder(Y)
-	A_hat = U * B * V'
-	println("Error de reconstrucción: ", norm(Y - A_hat))
-	
-end
-
-# ╔═╡ d8888165-0100-4c40-8bd1-0182f91e3565
-begin
-	
-	function is_bidiagonal(B; atol=1e-12)
-	    m, n = size(B)
-	    for i in 1:m
-	        for j in 1:n
-	            if (j != i && j != i+1) && abs(B[i,j]) > atol
-	                return false
-	            end
-	        end
-	    end
-	    return true
-	end
-	
-	@show is_bidiagonal(B)
-end
-
-# ╔═╡ 6c502074-cfa6-4d7d-8754-b4114743aaeb
-md"#### Ejemplo y validación"
-
-# ╔═╡ ab104798-39bf-44cb-ad07-9d5592524730
-md" ### Funciones auxiliares extra"
-
-# ╔═╡ d79631a6-4494-49bd-a9e5-8b100de0272d
-"""
-Aplica rotación de Givens por la derecha sobre d[k] y f[k]
-"""
-function apply_right_rotation!(d, f, k::Int, c::Float64, s::Float64)
-    d_k  = d[k]
-    f_k  = f[k]
-    d[k] =  c * d_k + s * f_k
-    f[k] = -s * d_k + c * f_k
-end
-
-
-# ╔═╡ 2edc23a7-b981-4416-8516-54084054bd74
-"""
-Aplica rotación de Givens por la izquierda sobre d[k] y d[k+1]
-"""
-function apply_left_rotation!(d, k::Int, c::Float64, s::Float64)
-    d_k  = d[k]
-    d_k1 = d[k+1]
-    d[k]   =  c * d_k + s * d_k1
-    d[k+1] = -s * d_k + c * d_k1
-end
-
+# ╔═╡ 311a1fdd-e0cc-413a-81c5-262e29a1132b
+md"
+#### Paso de Golub-Kahan"
 
 # ╔═╡ adba5d98-0080-4d56-81ca-897d8a97eb39
 """
@@ -710,7 +606,13 @@ function golub_kahan_svd_step_matrix!(B::Matrix{Float64})
         y = B[k, k]
         z = B[k+1, k]
         c, s, _ = givens_rotation(y, z)
-		apply_left_rotation!(B, k, c, s)
+		
+        for j in k:n
+            t1 = B[k, j]
+            t2 = B[k+1, j]
+            B[k, j]   =  c * t1 + s * t2
+            B[k+1, j] = -s * t1 + c * t2
+        end
 
         # Preparar vector (y, z) para la próxima rotación por la derecha
         if k < n - 1
@@ -724,6 +626,9 @@ function golub_kahan_svd_step_matrix!(B::Matrix{Float64})
     return B
 end
 
+
+# ╔═╡ e344fe0e-b939-4163-84ac-01c402895e38
+md"#### Diagonalización"
 
 # ╔═╡ b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
 """
@@ -800,6 +705,80 @@ function golub_kahan_svd_matrix!(B::Matrix{Float64}; ϵ = 100 * eps(Float64))
 end
 
 
+# ╔═╡ 8b74dc98-40e2-4a55-b98c-363910221ed4
+md"#### Alternativa implícita"
+
+# ╔═╡ 04eb9c27-8a4f-462e-930a-4f643d424769
+md"#### Algoritmo de Golub Kahan"
+
+# ╔═╡ 4e69684e-b6bb-439a-a8c7-3a65ebb36f25
+"""
+Reduce la matriz A a forma bidiagonal utilizando reflexiones de Householder.
+Devuelve la matriz bidiagonal B, y las matrices ortogonales U y V tal que A ≈ U * B * Vᵀ.
+"""
+function bidiagonalize_householder(A::Matrix{Float64})
+    m, n = size(A)
+    B = copy(A)
+    U = Matrix{Float64}(I, m, m)
+    V = Matrix{Float64}(I, n, n)
+
+    for i in 1:min(m, n)
+        # Reflexión de Householder desde la izquierda (columnas)
+        x = B[i:end, i]
+        v = copy(x)
+        v[1] += sign(x[1]) * norm(x)
+        v = v / norm(v)
+        B[i:end, i:end] -= 2 * v * (v' * B[i:end, i:end])
+        U[:, i:end] -= 2 * (U[:, i:end] * v) * v'
+
+        if i < n
+            # Reflexión de Householder desde la derecha (filas)
+            x = B[i, i+1:end]'
+            v = copy(x)
+            v[1] += sign(x[1]) * norm(x)
+            v = v / norm(v)
+            B[i:end, i+1:end] -= 2 * (B[i:end, i+1:end] * v') * v
+            V[:, i+1:end] -= 2 * (V[:, i+1:end] * v') * v
+        end
+    end
+
+    return B, U, V
+end
+
+
+# ╔═╡ 8138c8bb-ca12-492c-9e78-f88c692f9538
+begin
+	square_bidiagonal_example = bidiagonalize_householder(randn(10, 10))[1]
+	force_bidiagonal!(square_bidiagonal_example)
+end
+
+# ╔═╡ c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
+begin
+	Y = randn(5, 3)
+	B, U, V = bidiagonalize_householder(Y)
+	A_hat = U * B * V'
+	println("Error de reconstrucción: ", norm(Y - A_hat))
+	
+end
+
+# ╔═╡ d8888165-0100-4c40-8bd1-0182f91e3565
+begin
+	
+	function is_bidiagonal(B; atol=1e-12)
+	    m, n = size(B)
+	    for i in 1:m
+	        for j in 1:n
+	            if (j != i && j != i+1) && abs(B[i,j]) > atol
+	                return false
+	            end
+	        end
+	    end
+	    return true
+	end
+	
+	@show is_bidiagonal(B)
+end
+
 # ╔═╡ 65aa59c8-586f-4850-875c-7a19ed968882
 """
 Calcula la SVD de una matriz A ∈ ℝ^{m×n} utilizando el algoritmo de Golub-Kahan.
@@ -823,6 +802,9 @@ function svd_golub_kahan(A::Matrix{Float64}; tol=1e-12, maxiter=1000)
 end
 
 
+# ╔═╡ 6c502074-cfa6-4d7d-8754-b4114743aaeb
+md"#### Ejemplo y validación"
+
 # ╔═╡ 537968ea-5d8c-4adc-9f36-d229e21d4085
 begin
 	F3 = svd_golub_kahan(example)
@@ -831,6 +813,33 @@ end
 
 # ╔═╡ 4f81f155-f5c7-42f2-8e10-af8ae8ad1dae
 A_reconstructed = reconstruct_from_svd(F3)
+
+# ╔═╡ ab104798-39bf-44cb-ad07-9d5592524730
+md" ### Funciones auxiliares extra"
+
+# ╔═╡ d79631a6-4494-49bd-a9e5-8b100de0272d
+"""
+Aplica rotación de Givens por la derecha sobre d[k] y f[k]
+"""
+function apply_right_rotation!(d, f, k::Int, c::Float64, s::Float64)
+    d_k  = d[k]
+    f_k  = f[k]
+    d[k] =  c * d_k + s * f_k
+    f[k] = -s * d_k + c * f_k
+end
+
+
+# ╔═╡ 2edc23a7-b981-4416-8516-54084054bd74
+"""
+Aplica rotación de Givens por la izquierda sobre d[k] y d[k+1]
+"""
+function apply_left_rotation!(d, k::Int, c::Float64, s::Float64)
+    d_k  = d[k]
+    d_k1 = d[k+1]
+    d[k]   =  c * d_k + s * d_k1
+    d[k+1] = -s * d_k + c * d_k1
+end
+
 
 # ╔═╡ 56c579f8-939f-445a-aae2-098e944c56f7
 """
@@ -907,23 +916,24 @@ function validate_bidiagonal_svd_step(B0::Matrix{Float64}, método::Symbol)
 	λ1 = eigen(Symmetric(A1)).values
     f_after = [B[i, i+1] for i in 1:n-1]	
 
+	println()
 	println("Método: ", método)
-    println("¿Ahora es bidiagonal?: ", is_bidiagonal(B))
+    println("¿Todavía es bidiagonal?: ", is_bidiagonal(B))
+	display(B)
     println("Reducción superdiagonal: ", norm(f_before) > norm(f_after))
     println("‖BᵗB‖₂ antes: ", norm(A0), " — después: ", norm(A1))
     println("‖BᵗB - nuevo‖: ", norm(A1 - A0))
 	println("Diferencia en autovalores de BᵗB: ", norm(sort(λ0) - sort(λ1)))
-	println("")
-
 end
 
 
 # ╔═╡ 13f39950-32d3-428f-a33b-71dae23be7ac
 begin
 	println("Estado")
+	@show is_bidiagonal(square_bidiagonal_example)
 	validate_bidiagonal_svd_step(square_bidiagonal_example,:step_matrix)
-	validate_bidiagonal_svd_step(square_bidiagonal_example,:matrix)
-	validate_bidiagonal_svd_step(square_bidiagonal_example,:step_vector)
+	# validate_bidiagonal_svd_step(square_bidiagonal_example,:matrix)
+	# validate_bidiagonal_svd_step(square_bidiagonal_example,:step_vector)
 end
 
 # ╔═╡ a48dea5f-3e17-45d2-9a07-7eb0228ca516
@@ -1117,18 +1127,19 @@ version = "5.11.0+0"
 # ╟─247c0f32-0141-424f-9e8d-6dda19a521db
 # ╟─d5e98c9e-92ee-454d-9de8-7c5f38e89c68
 # ╟─7902449e-e1ca-4dd7-aef1-96d32e051f40
+# ╠═32c6c09f-c6e5-476e-b15a-6c5de2db0423
 # ╟─c2105a86-9dda-4ccb-a9df-cba3c10b6161
 # ╟─cfa62a92-828e-4510-81ae-985e84e2250e
 # ╟─8ca30862-249a-444d-8a79-702ec8732935
 # ╟─09168c5e-1192-41cd-a610-2152a688d90f
-# ╠═13f39950-32d3-428f-a33b-71dae23be7ac
+# ╟─13f39950-32d3-428f-a33b-71dae23be7ac
 # ╟─3069c786-0823-42a0-92c0-4df61174e5d1
 # ╟─311a1fdd-e0cc-413a-81c5-262e29a1132b
 # ╠═adba5d98-0080-4d56-81ca-897d8a97eb39
 # ╟─e344fe0e-b939-4163-84ac-01c402895e38
 # ╟─b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
 # ╟─8b74dc98-40e2-4a55-b98c-363910221ed4
-# ╠═56c579f8-939f-445a-aae2-098e944c56f7
+# ╟─56c579f8-939f-445a-aae2-098e944c56f7
 # ╟─04eb9c27-8a4f-462e-930a-4f643d424769
 # ╟─4e69684e-b6bb-439a-a8c7-3a65ebb36f25
 # ╠═c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
@@ -1139,8 +1150,8 @@ version = "5.11.0+0"
 # ╠═4f81f155-f5c7-42f2-8e10-af8ae8ad1dae
 # ╠═537968ea-5d8c-4adc-9f36-d229e21d4085
 # ╟─ab104798-39bf-44cb-ad07-9d5592524730
-# ╟─d79631a6-4494-49bd-a9e5-8b100de0272d
-# ╟─2edc23a7-b981-4416-8516-54084054bd74
+# ╠═d79631a6-4494-49bd-a9e5-8b100de0272d
+# ╠═2edc23a7-b981-4416-8516-54084054bd74
 # ╟─a0b20c8f-64dd-4966-87c3-ba4156ebdbf2
 # ╟─78ad67b1-5ead-4d3e-b5bb-062907f524f5
 # ╟─277c10ee-bd03-4efe-b54b-0d835a8781a0
