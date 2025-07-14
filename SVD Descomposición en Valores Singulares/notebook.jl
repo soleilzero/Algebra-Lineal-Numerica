@@ -489,7 +489,39 @@ function givens_rotation(y::Float64, z::Float64)
 end
 
 
+# ╔═╡ b82571c1-6a98-4789-b2c0-62b294978553
+function GivensCoefficients(y , z )
+	if z ==0
+		c =1
+		s =0
+	else
+		if abs(z) >= abs(y)
+			t = y / z
+			s =1/((1+ t^2)^(1/2) )
+			c = s * t
+		else
+			t = z / y
+			c =1/((1+ t^2)^(1/2) )
+			s = c * t
+		end
+	end
+	return c , s
+end
+
 # ╔═╡ 32c6c09f-c6e5-476e-b15a-6c5de2db0423
+"""
+Aplica rotación de Givens por la izquierda sobre d[k] y d[k+1]
+"""
+function givens_product!(c, s, a, b)
+	n = size(a)
+	for j in n
+		v = a[j]
+		w = b[j]
+		a[j]= c * v + s * w
+		b[j]= - s * v + c * w
+	end
+	return a , b
+end
 
 
 # ╔═╡ c2105a86-9dda-4ccb-a9df-cba3c10b6161
@@ -566,6 +598,93 @@ Por esto, creemos otra implementación que utilice la matriz bidiagonal de maner
 # ╔═╡ 311a1fdd-e0cc-413a-81c5-262e29a1132b
 md"
 #### Paso de Golub-Kahan"
+
+# ╔═╡ 8616d7db-4fac-41d2-aa7a-93551a831d3c
+function GKStep(B)
+	n = size(B, 1)
+    @assert size(B, 2) == n
+	
+	#T = [[d_m ^2+ f_m ^2, d_m*f_n ],[ d_m*f_n, d_n ^2+ f_n ^2]]
+	#Find mu , the eigenvalue of T that is closest to d_n ^2 + f_n ^2
+	d = diag(B)
+    f = [B[i, i+1] for i in 1:n-1]
+    mu = wilkinson_shift(d[end-1], f[end], d[end])
+	
+	y = B[1,1]^2 - mu
+	z = B[1,2] * B[1,1]
+	
+	for k in 1:n-1 
+		c , s = GivensCoefficients(y,z)
+		B[:,k], B[:,k+1] = givens_product!(c,s,B[:,k],B[:,k+1])
+		
+		y = B[k,k]
+		z = B[k+1,k]
+		
+		c , s = GivensCoefficients(y,z)
+		B[k,:], B[k+1,:] = givens_product!(c,s,B[k,:], B[k+1,:])
+		
+		if k<n-2
+			y = B[k , k +1]
+			z = B[k , k +2]
+		end
+	return B
+	end
+end
+
+# ╔═╡ 02a7d875-d1ac-49fb-9710-c83d36af1ead
+function GKalg!(B::Matrix{Float64}; tol=1e-12, maxiter=1000)
+    n = size(B,1)
+    @assert size(B,2) == n "B debe ser cuadrada"
+
+    for iter in 1:maxiter
+        # Deflación: anular elementos pequeños en la superdiagonal
+        for i in 1:n-1
+            if abs(B[i, i+1]) ≤ tol * (abs(B[i,i]) + abs(B[i+1,i+1]))
+                B[i, i+1] = 0.0
+            end
+        end
+
+        # Buscar el mayor q tal que B[q-1,q] ≠ 0
+        q = n
+        while q > 1 && B[q-1, q] == 0.0
+            q -= 1
+        end
+
+        if q == 1
+            break  # Matriz ya es diagonal
+        end
+
+        # Buscar el menor p tal que B[p-1, p] = 0
+        p = q - 1
+        while p > 1 && B[p-1, p] ≠ 0.0
+            p -= 1
+        end
+
+        # Verificar si hay ceros en la diagonal en el bloque activo
+        zero_on_diag = false
+        max_d = maximum(abs.(diag(B)))
+        for i in p:q
+            if abs(B[i,i]) ≤ tol * max_d
+                zero_on_diag = true
+                break
+            end
+        end
+
+        if zero_on_diag
+            # Anular los f_i correspondientes en el bloque
+            for i in p:q-1
+                if abs(B[i,i]) ≤ tol * max_d
+                    B[i,i+1] = 0.0
+                end
+            end
+        else
+            # Aplicar un paso de Golub–Kahan al bloque activo
+            GKStep(B[p:q, p:q])
+        end
+    end
+
+    return B
+end
 
 # ╔═╡ adba5d98-0080-4d56-81ca-897d8a97eb39
 """
@@ -887,7 +1006,7 @@ Aplica la transformación y reporta:
 - Si se reduce la superdiagonal
 - Si se conserva la norma de BᵗB
 """
-function validate_bidiagonal_svd_step(B0::Matrix{Float64}, método::Symbol)
+function validate_bidiagonal_svd_step(B0::Matrix{Float64}, fun::Function)
     B = copy(B0)
     n = size(B, 1)
     @assert size(B,2) == n "B debe ser cuadrada"
@@ -896,20 +1015,14 @@ function validate_bidiagonal_svd_step(B0::Matrix{Float64}, método::Symbol)
 	λ0 = eigen(Symmetric(A0)).values
     f_before = [B[i, i+1] for i in 1:n-1]
 
-    if método == :step_matrix
-        golub_kahan_svd_step_matrix!(B)
-
-    elseif método == :matrix
-        golub_kahan_svd_matrix!(B)
-
-    elseif método == :step_vector
+    if fun == golub_kahan_svd_step_vector!
         d = diag(B)
         f = [B[i, i+1] for i in 1:n-1]
         golub_kahan_svd_step_vector!(d, f)
         B .= build_bidiagonal(d, f)  # reconstruir B
 
     else
-        error("Método no reconocido: $método")
+        fun(B)
     end
 
     A1 = B' * B
@@ -917,7 +1030,7 @@ function validate_bidiagonal_svd_step(B0::Matrix{Float64}, método::Symbol)
     f_after = [B[i, i+1] for i in 1:n-1]	
 
 	println()
-	println("Método: ", método)
+	println("Método: ", fun)
     println("¿Todavía es bidiagonal?: ", is_bidiagonal(B))
 	display(B)
     println("Reducción superdiagonal: ", norm(f_before) > norm(f_after))
@@ -931,7 +1044,9 @@ end
 begin
 	println("Estado")
 	@show is_bidiagonal(square_bidiagonal_example)
-	validate_bidiagonal_svd_step(square_bidiagonal_example,:step_matrix)
+	#validate_bidiagonal_svd_step(square_bidiagonal_example,golub_kahan_svd_step_matrix!)
+	validate_bidiagonal_svd_step(square_bidiagonal_example,GKStep)
+	validate_bidiagonal_svd_step(square_bidiagonal_example,GKalg!)
 	# validate_bidiagonal_svd_step(square_bidiagonal_example,:matrix)
 	# validate_bidiagonal_svd_step(square_bidiagonal_example,:step_vector)
 end
@@ -1127,14 +1242,17 @@ version = "5.11.0+0"
 # ╟─247c0f32-0141-424f-9e8d-6dda19a521db
 # ╟─d5e98c9e-92ee-454d-9de8-7c5f38e89c68
 # ╟─7902449e-e1ca-4dd7-aef1-96d32e051f40
+# ╠═b82571c1-6a98-4789-b2c0-62b294978553
 # ╠═32c6c09f-c6e5-476e-b15a-6c5de2db0423
 # ╟─c2105a86-9dda-4ccb-a9df-cba3c10b6161
 # ╟─cfa62a92-828e-4510-81ae-985e84e2250e
 # ╟─8ca30862-249a-444d-8a79-702ec8732935
-# ╟─09168c5e-1192-41cd-a610-2152a688d90f
-# ╟─13f39950-32d3-428f-a33b-71dae23be7ac
+# ╠═09168c5e-1192-41cd-a610-2152a688d90f
+# ╠═13f39950-32d3-428f-a33b-71dae23be7ac
 # ╟─3069c786-0823-42a0-92c0-4df61174e5d1
 # ╟─311a1fdd-e0cc-413a-81c5-262e29a1132b
+# ╠═8616d7db-4fac-41d2-aa7a-93551a831d3c
+# ╠═02a7d875-d1ac-49fb-9710-c83d36af1ead
 # ╠═adba5d98-0080-4d56-81ca-897d8a97eb39
 # ╟─e344fe0e-b939-4163-84ac-01c402895e38
 # ╟─b2928cde-9e9b-4d28-8a0a-45bae8e8f4ef
