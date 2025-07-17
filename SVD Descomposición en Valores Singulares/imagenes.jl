@@ -10,6 +10,7 @@ begin
 	using Images
 	using ImageIO
 	using Plots
+	using Statistics
 end
 
 # ╔═╡ cc79ca6a-6232-11f0-0def-2166b5607fa9
@@ -117,7 +118,7 @@ md"
 "
 
 # ╔═╡ b4f8f1bc-7566-4f00-9398-39f282e92d32
-img_gray = Gray.(load("imagen_ejemplo.png"))
+img_example = Gray.(load("imagen_ejemplo.png"))
 
 # ╔═╡ 6c71642a-b1e0-4866-b304-aec85e4d71f1
 md"### Generar máscara de observación"
@@ -139,10 +140,64 @@ end
 
 
 # ╔═╡ 88441cf4-a3af-4ad6-b10f-9cb4f7a3024c
-M = generate_mask(img_gray, .95)
+begin
+	mask_example = generate_mask(img_example, .95)
+	Gray.(mask_example)
+end
 
-# ╔═╡ 66d2463c-11eb-4416-a59b-de33d43d8509
-Gray.(M)
+# ╔═╡ aa48a83d-6310-4713-9f9c-43644265bafd
+md"
+#### Inicialización
+Punto de partida más realista"
+
+# ╔═╡ c67b15c5-2115-4233-8f61-a55a9d3ae411
+"""
+Rellena los valores faltantes de `A_obs` usando una estimación inicial.
+
+Argumentos:
+- `A_obs`: Matriz de la imagen observada.
+- `M`: Máscara de observación (1 conocido, 0 faltante).
+- `method`: `"row"`, `"col"` o `"global"`.
+
+Retorna la matriz inicializada.
+"""
+function initialize_missing(A_obs, M; method="row")
+    A_init = copy(A_obs)
+
+    if method == "row"
+        for i in 1:size(A_obs, 1)
+            known = findall(M[i, :] .== 1.0)
+            mean_val = isempty(known) ? 0.0 : mean(A_obs[i, known])
+            for j in 1:size(A_obs, 2)
+                if M[i,j] == 0.0
+                    A_init[i,j] = mean_val
+                end
+            end
+        end
+
+    elseif method == "col"
+        for j in 1:size(A_obs, 2)
+            known = findall(M[:, j] .== 1.0)
+            mean_val = isempty(known) ? 0.0 : mean(A_obs[known, j])
+            for i in 1:size(A_obs, 1)
+                if M[i,j] == 0.0
+                    A_init[i,j] = mean_val
+                end
+            end
+        end
+
+    elseif method == "global"
+        known_vals = A_obs[M .== 1.0]
+        mean_val = isempty(known_vals) ? 0.0 : mean(known_vals)
+        A_init[M .== 0.0] .= mean_val
+
+    else
+        error("Método no reconocido. Usa 'row', 'col' o 'global'.")
+    end
+
+    return A_init
+end
+
 
 # ╔═╡ 8558ba84-507e-4034-99fe-432afdc12087
 md"
@@ -191,20 +246,8 @@ function svd_inpainting(A_obs::Matrix{Float64}, M::Matrix{Float64}, k::Int=50, m
 end
 
 
-# ╔═╡ 71569bce-f651-4b04-8706-5bfbafc2514e
-A_obs = Float64.(img_gray)
-
 # ╔═╡ 0d51d180-241a-4e5e-b543-fdef4a3ae321
-A_rec = svd_inpainting(A_obs, M, 10, 10)
-
-# ╔═╡ 2a0e8b42-1a6f-4ba9-8c7d-d88f5b392684
-md"### Visualizar el resultado"
-
-# ╔═╡ b254e50b-0b30-4322-99fd-a2cb0d9652d8
-Gray.(A_rec)
-
-# ╔═╡ 33a10af1-7a13-4b05-a597-a956cc68e8f6
-A_rec
+Gray.(svd_inpainting(Float64.(img_example), mask_example, 10, 10))
 
 # ╔═╡ 1f0f90c2-f71b-4fde-b223-22d101ff44c9
 md"
@@ -212,8 +255,111 @@ md"
 "
 
 # ╔═╡ 96af3132-6566-4cb7-a210-3d019467550d
-	img = load("imagen_ejemplo.png")
-	img_gray = Gray.(img)
+begin
+	A1_obs = Float64.(Gray.(load("imagen_ejemplo.png")))
+	mask = generate_mask(A1_obs, .95)
+	nothing
+end
+
+# ╔═╡ 8ec4d0fe-f670-4cd6-9fc3-137497dea1a4
+mosaicview(
+	Gray.(A1_obs), 
+	Gray.(mask), 
+	Gray.(svd_inpainting(A1_obs, mask, 10, 10)); 
+	ncol=3
+)
+
+# ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
+md"
+## Evaluación de resultados
+Con daño simulado: 
+* calcular errores contra la original
+
+Con daño real:
+* mostrar que se puede hacer (análisis subjetivo)
+
+Ambos:
+* Comparación visual para diferentes valores en la restitución (k y max_iter)
+"
+
+# ╔═╡ f9739f4e-71cf-47b0-b193-bce281c5fee8
+"""
+Genera distintas inicializaciones para los valores faltantes de `A`.
+
+Retorna un diccionario con las inicializaciones: `:row`, `:col`, `:global`, `:no_init`
+"""
+function generate_initializations(A, mask)
+    return Dict(
+        :no_init => A,
+        :row => initialize_missing(A, mask; method="row"),
+        :col => initialize_missing(A, mask; method="col"),
+        :global => initialize_missing(A, mask; method="global")
+    )
+end
+
+
+# ╔═╡ 18428c85-668c-45e4-ad6d-0e0d43b94be7
+"""
+Aplica SVD inpainting a cada inicialización.
+
+Argumentos:
+- `initializations`: Diccionario de matrices inicializadas.
+- `mask`: Máscara binaria.
+
+Retorna un diccionario de reconstrucciones.
+"""
+function reconstruct_all(initializations, mask; k=50, max_iter=30)
+    recs = Dict()
+    for (key, A_init) in initializations
+        recs[key] = svd_inpainting(A_init, mask, k, max_iter)
+    end
+    return recs
+end
+
+
+# ╔═╡ 83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
+"""
+Muestra las reconstrucciones en un `mosaicview` en formato 2x2.
+
+Argumentos: 
+- `recs`: Diccionario de imágenes reconstruidas.
+- `ncol`: Número de columnas en el mosaico
+"""
+function show_reconstructions(recs; ncol=2)
+    imgs = [Gray.(recs[key]) for key in keys(recs)]
+    mosaicview(imgs...; ncol=ncol)
+end
+
+
+# ╔═╡ 120da197-8913-460e-86f7-24e51ad30edc
+md"### Comparación de inicializaciones para diferentes valores de k"
+
+# ╔═╡ a322892a-a789-4679-8639-a13b35884522
+"""
+Ejecuta todo el proceso de comparación.
+"""
+function compare_initilizations(A, mask; k=50, max_iter=10)
+    inits = generate_initializations(A, mask)
+    recs = reconstruct_all(inits, mask; k=k, max_iter=max_iter)
+	println("Orden de las imágenes: ", collect(keys(recs)))
+	show_reconstructions(recs)
+end
+
+
+# ╔═╡ 1bc17a9d-3252-4e6f-a373-b8457f209c99
+compare_initilizations(A1_obs, mask; k=5)
+
+# ╔═╡ 647fdaa6-0fb8-4aee-af48-2b6254a04552
+compare_initilizations(A1_obs, mask; k=30)
+
+# ╔═╡ 460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
+md"
+**Resultado:**
+
+Para $k=5$, la inicialización o no inicialización de la imagen no cambia mucho.
+
+Para $k=30$, los huecos tienden al color de base, por lo que la imagen no inicializada es más claramente erronea. Sin embargo no se ven diferencias mayores entre los 3 métodos de inicialización, por lo que solo vamos a utilizar el global de ahora en adelante.
+"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -222,11 +368,13 @@ ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
 ImageIO = "~0.6.9"
 Images = "~0.26.2"
 Plots = "~1.40.17"
+Statistics = "~1.11.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -235,7 +383,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "e709719bc0fbb4186a55dcc48241e87b6f50b8cb"
+project_hash = "157dcf914f24bc22fd0ad609976634bdf9e47433"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -2121,21 +2269,28 @@ version = "1.9.2+0"
 # ╟─2812ab89-9954-412c-935e-5281ed29e7b8
 # ╟─b9af3222-0516-4388-80c1-7af8a6356601
 # ╟─8c798beb-8a08-426a-bd07-dd124b2add09
-# ╟─890a2834-49b6-4351-b3d9-f124e809322d
-# ╟─59bc0d60-cfbe-49e9-95e2-7e07c8c94af7
+# ╠═890a2834-49b6-4351-b3d9-f124e809322d
+# ╠═59bc0d60-cfbe-49e9-95e2-7e07c8c94af7
 # ╠═b4f8f1bc-7566-4f00-9398-39f282e92d32
 # ╟─6c71642a-b1e0-4866-b304-aec85e4d71f1
 # ╠═dfa2de65-b023-4c75-99bd-e714861ad46f
 # ╠═88441cf4-a3af-4ad6-b10f-9cb4f7a3024c
-# ╠═66d2463c-11eb-4416-a59b-de33d43d8509
+# ╠═aa48a83d-6310-4713-9f9c-43644265bafd
+# ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
 # ╟─8558ba84-507e-4034-99fe-432afdc12087
 # ╠═dc78e695-4852-424e-ae63-34762cded85b
-# ╠═71569bce-f651-4b04-8706-5bfbafc2514e
 # ╠═0d51d180-241a-4e5e-b543-fdef4a3ae321
-# ╠═2a0e8b42-1a6f-4ba9-8c7d-d88f5b392684
-# ╠═b254e50b-0b30-4322-99fd-a2cb0d9652d8
-# ╠═33a10af1-7a13-4b05-a597-a956cc68e8f6
-# ╠═1f0f90c2-f71b-4fde-b223-22d101ff44c9
+# ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
+# ╠═8ec4d0fe-f670-4cd6-9fc3-137497dea1a4
+# ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
+# ╟─f9739f4e-71cf-47b0-b193-bce281c5fee8
+# ╟─18428c85-668c-45e4-ad6d-0e0d43b94be7
+# ╟─83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
+# ╟─120da197-8913-460e-86f7-24e51ad30edc
+# ╠═a322892a-a789-4679-8639-a13b35884522
+# ╠═1bc17a9d-3252-4e6f-a373-b8457f209c99
+# ╠═647fdaa6-0fb8-4aee-af48-2b6254a04552
+# ╟─460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
