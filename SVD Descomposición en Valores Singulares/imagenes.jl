@@ -361,6 +361,25 @@ Para $k=5$, la inicialización o no inicialización de la imagen no cambia mucho
 Para $k=30$, los huecos tienden al color de base, por lo que la imagen no inicializada es más claramente erronea. Sin embargo no se ven diferencias mayores entre los 3 métodos de inicialización, por lo que solo vamos a utilizar el global de ahora en adelante.
 "
 
+# ╔═╡ 6683a374-9ab6-41de-9be2-deb7ba4a1f3d
+md"
+### Diferentes valores de k
+Queremos un mosaico que muestre las imágenes con k=5,10,20,40 por e.g.
+"
+
+# ╔═╡ 056f906e-3f34-4030-8ab7-a3f88496a44b
+A_global = initialize_missing(A1_obs, mask; method="global");
+
+# ╔═╡ fe9f245b-0c84-45ef-94da-bfc29e5c7b32
+mosaicview(
+	Gray.(svd_inpainting(A_global, mask, 10)),
+	Gray.(svd_inpainting(A_global, mask, 30)),
+	Gray.(svd_inpainting(A_global, mask, 50)),
+	Gray.(svd_inpainting(A_global, mask, 75)),
+	Gray.(svd_inpainting(A_global, mask, 200));
+	ncol = 1
+)
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -2278,7 +2297,7 @@ version = "1.9.2+0"
 # ╠═aa48a83d-6310-4713-9f9c-43644265bafd
 # ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
 # ╟─8558ba84-507e-4034-99fe-432afdc12087
-# ╠═dc78e695-4852-424e-ae63-34762cded85b
+# ╟─dc78e695-4852-424e-ae63-34762cded85b
 # ╠═0d51d180-241a-4e5e-b543-fdef4a3ae321
 # ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
@@ -2292,5 +2311,8 @@ version = "1.9.2+0"
 # ╠═1bc17a9d-3252-4e6f-a373-b8457f209c99
 # ╠═647fdaa6-0fb8-4aee-af48-2b6254a04552
 # ╟─460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
+# ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
+# ╠═056f906e-3f34-4030-8ab7-a3f88496a44b
+# ╠═fe9f245b-0c84-45ef-94da-bfc29e5c7b32
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
