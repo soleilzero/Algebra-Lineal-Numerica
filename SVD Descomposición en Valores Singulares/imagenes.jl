@@ -203,11 +203,17 @@ end
 md"
 ### Aplicar algoritmo de in-painting por SVD
 
-¿Qué hace el algoritmo?
+**¿Qué hace el algoritmo?**
 
-Completa una imagen incompleta buscando la mejor aproximación de rango bajo que respete los píxeles conocidos.
+Es un algoritmo iterativo que rellena los valores faltantes de una matriz (por ejemplo, una imagen dañada).
+Para esto busca la matriz más sencilla (suavizada) que:
+* Respete los valores conocidos.
+* Tenga rango bajo.
 
-
+**¿Por qué funciona?**
+* El SVD captura la estructura global del algoritmo,
+* el truncado de rango impone regularidad y elimina el ruido,
+* las iteraciones sucesivas fuerzan que la solución sea consistente con datos conocidos
 "
 
 # ╔═╡ dc78e695-4852-424e-ae63-34762cded85b
@@ -365,6 +371,12 @@ Para $k=30$, los huecos tienden al color de base, por lo que la imagen no inicia
 md"
 ### Diferentes valores de k
 Queremos un mosaico que muestre las imágenes con k=5,10,20,40 por e.g.
+
+Un $k$ pequeño implica una imagen muy suavizada. Solo se preservan patrones globales y se pierde el detalle.
+
+Un $k$ intermedio reconstruye patrones generales y algo de textura.
+
+Un $k$ grande preserva detalles finos, pero también amplifica errores si el daño es severo.
 "
 
 # ╔═╡ 056f906e-3f34-4030-8ab7-a3f88496a44b
@@ -2294,10 +2306,10 @@ version = "1.9.2+0"
 # ╟─6c71642a-b1e0-4866-b304-aec85e4d71f1
 # ╠═dfa2de65-b023-4c75-99bd-e714861ad46f
 # ╠═88441cf4-a3af-4ad6-b10f-9cb4f7a3024c
-# ╠═aa48a83d-6310-4713-9f9c-43644265bafd
+# ╟─aa48a83d-6310-4713-9f9c-43644265bafd
 # ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
 # ╟─8558ba84-507e-4034-99fe-432afdc12087
-# ╟─dc78e695-4852-424e-ae63-34762cded85b
+# ╠═dc78e695-4852-424e-ae63-34762cded85b
 # ╠═0d51d180-241a-4e5e-b543-fdef4a3ae321
 # ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
