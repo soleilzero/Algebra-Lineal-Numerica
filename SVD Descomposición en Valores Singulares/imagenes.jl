@@ -275,6 +275,26 @@ mosaicview(
 	ncol=3
 )
 
+# ╔═╡ bfbb1d25-bff4-4e43-b95e-27a20a28e03f
+md"
+## Ejemplos reales
+"
+
+# ╔═╡ 252c7103-24e7-4bf8-9e17-372f9bde3fe2
+function compare(image_name; threshold=.9, k = 10)
+	img_real = Float64.(Gray.(load(image_name)))
+	mask_real = generate_mask(img_real, threshold)
+	mosaicview(
+		Gray.(mask_real), 
+		Gray.(img_real), 
+		Gray.(svd_inpainting(img_real, mask_real, k)); 
+		ncol=3
+	)
+end
+
+# ╔═╡ 830b8b01-d817-40d7-a040-e843b5b3864d
+compare("imagen_ejemplo_6.jpeg"; threshold=.55)
+
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
 ## Evaluación de resultados
@@ -2314,6 +2334,9 @@ version = "1.9.2+0"
 # ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═8ec4d0fe-f670-4cd6-9fc3-137497dea1a4
+# ╟─bfbb1d25-bff4-4e43-b95e-27a20a28e03f
+# ╠═252c7103-24e7-4bf8-9e17-372f9bde3fe2
+# ╠═830b8b01-d817-40d7-a040-e843b5b3864d
 # ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
 # ╟─f9739f4e-71cf-47b0-b193-bce281c5fee8
 # ╟─18428c85-668c-45e4-ad6d-0e0d43b94be7
