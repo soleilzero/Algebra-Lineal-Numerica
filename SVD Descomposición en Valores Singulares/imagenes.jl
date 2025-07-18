@@ -160,21 +160,7 @@ Recibe una imagen $A$, una máscara $M$, un rango máximo $k$ y un máximo de it
 # ╔═╡ 8c798beb-8a08-426a-bd07-dd124b2add09
 md"
 ## Implementación
-1. Cargar la imagen y convertir a escala de grises
-2. Generar máscara de observación
-3. Aplicar algoritmo de in-painting por SVD
-4. Visualizar el resultado
-
-Flow
 "
-
-# ╔═╡ 59bc0d60-cfbe-49e9-95e2-7e07c8c94af7
-md"
-### Cargar la imagen y convertir a escala de grises
-"
-
-# ╔═╡ b4f8f1bc-7566-4f00-9398-39f282e92d32
-img_example = Gray.(load("imagen_ejemplo.png"))
 
 # ╔═╡ 6c71642a-b1e0-4866-b304-aec85e4d71f1
 md"### Generar máscara de observación"
@@ -195,16 +181,11 @@ function generate_mask(img, threshold=0.95)
 end
 
 
-# ╔═╡ 88441cf4-a3af-4ad6-b10f-9cb4f7a3024c
-begin
-	mask_example = generate_mask(img_example, .95)
-	Gray.(mask_example)
-end
-
 # ╔═╡ aa48a83d-6310-4713-9f9c-43644265bafd
 md"
 #### Inicialización
-Punto de partida más realista"
+Podemos inicializar los valores faltantes de cada matriz a un valor promedio de su fila o columna, esto permite dar un mejor punto de partida al algoritmo
+"
 
 # ╔═╡ c67b15c5-2115-4233-8f61-a55a9d3ae411
 """
@@ -308,54 +289,48 @@ function svd_inpainting(A_obs::Matrix{Float64}, M::Matrix{Float64}, k::Int=50, m
 end
 
 
-# ╔═╡ 0d51d180-241a-4e5e-b543-fdef4a3ae321
-Gray.(svd_inpainting(Float64.(img_example), mask_example, 10, 10))
-
 # ╔═╡ 1f0f90c2-f71b-4fde-b223-22d101ff44c9
 md"
-## Workflow
+## Ejemplos
+A continuación veremos dos ejemplos de imágenes, la primera ha sido dañada artificialmente y la segunda ha tenido daño real.
+
+En las gráficas podremos ver, en orden:
+* la imagen original
+* la máscara utilizada
+* un posible resultado.
 "
 
 # ╔═╡ 96af3132-6566-4cb7-a210-3d019467550d
 begin
-	A1_obs = Float64.(Gray.(load("imagen_ejemplo.png")))
-	mask = generate_mask(A1_obs, .95)
-	nothing
-end
-
-# ╔═╡ 8ec4d0fe-f670-4cd6-9fc3-137497dea1a4
-mosaicview(
-	Gray.(A1_obs), 
-	Gray.(mask), 
-	Gray.(svd_inpainting(A1_obs, mask, 10, 10)); 
+	matrix_ex1 = Float64.(Gray.(load("imagen_ejemplo.png")))
+	mask_ex1 = generate_mask(matrix_ex1, .95)
+	init_ex1 = initialize_missing(matrix_ex1, mask_ex1; method="global");
+	
+	mosaicview(
+	Gray.(matrix_ex1), 
+	Gray.(mask_ex1), 
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1, 10, 10)); 
 	ncol=3
 )
-
-# ╔═╡ bfbb1d25-bff4-4e43-b95e-27a20a28e03f
-md"
-## Ejemplos reales
-"
-
-# ╔═╡ 252c7103-24e7-4bf8-9e17-372f9bde3fe2
-function compare(image_name; threshold=.9, k = 10, max_iter = 30)
-	img_real = Float64.(Gray.(load(image_name)))
-	mask_real = generate_mask(img_real, threshold)
-	img_init = initialize_missing(img_real, mask_real; method="global")
-	mosaicview(
-		Gray.(mask_real), 
-		Gray.(svd_inpainting(img_init, mask_real, k, max_iter)),
-		Gray.(img_real),
-		Gray.(svd_inpainting(img_real, mask_real, k, max_iter)); 
-		ncol=2
-	)
 end
 
-# ╔═╡ 830b8b01-d817-40d7-a040-e843b5b3864d
-compare("imagen_ejemplo_6.jpeg"; threshold=.55)
+# ╔═╡ 5b2ba4a0-448a-4300-a259-da1d02ac1bbd
+begin
+	matrix_ex2 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
+	mask_ex2 = generate_mask(matrix_ex2, .6)
+	init_ex2 = initialize_missing(matrix_ex2, mask_ex2; method="global");
+	
+	mosaicview(
+	Gray.(matrix_ex2), 
+	Gray.(mask_ex2), 
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2, 10, 10)); 
+	ncol=3
+)
+end
 
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
-## Evaluación de resultados
+## Experimentos y análisis
 Con daño simulado: 
 * calcular errores contra la original
 
@@ -365,22 +340,6 @@ Con daño real:
 Ambos:
 * Comparación visual para diferentes valores en la restitución (k y max_iter)
 "
-
-# ╔═╡ f9739f4e-71cf-47b0-b193-bce281c5fee8
-"""
-Genera distintas inicializaciones para los valores faltantes de `A`.
-
-Retorna un diccionario con las inicializaciones: `:row`, `:col`, `:global`, `:no_init`
-"""
-function generate_initializations(A, mask)
-    return Dict(
-        :no_init => A,
-        :row => initialize_missing(A, mask; method="row"),
-        :col => initialize_missing(A, mask; method="col"),
-        :global => initialize_missing(A, mask; method="global")
-    )
-end
-
 
 # ╔═╡ 18428c85-668c-45e4-ad6d-0e0d43b94be7
 """
@@ -418,29 +377,59 @@ end
 # ╔═╡ 120da197-8913-460e-86f7-24e51ad30edc
 md"### Comparación de inicializaciones para diferentes valores de k"
 
+# ╔═╡ f9739f4e-71cf-47b0-b193-bce281c5fee8
+"""
+Genera distintas inicializaciones para los valores faltantes de `A`.
+
+Retorna un diccionario con las inicializaciones: `:row`, `:col`, `:global`, `:no_init`
+"""
+function generate_initializations(A, mask)
+    return Dict(
+        :no_init => A,
+        :row => initialize_missing(A, mask; method="row"),
+        :col => initialize_missing(A, mask; method="col"),
+        :global => initialize_missing(A, mask; method="global")
+    )
+end
+
+
 # ╔═╡ a322892a-a789-4679-8639-a13b35884522
 """
 Ejecuta todo el proceso de comparación.
 """
-function compare_initilizations(A, mask; k=50, max_iter=10)
+function compare_initilizations(A, mask; k=50, max_iter=10, ncol=4, verbose=false)
     inits = generate_initializations(A, mask)
     recs = reconstruct_all(inits, mask; k=k, max_iter=max_iter)
-	println("Orden de las imágenes: ", collect(keys(recs)))
-	show_reconstructions(recs)
+	if verbose
+		println("Orden de las imágenes: ", collect(keys(recs)))
+	end
+	show_reconstructions(recs, ncol=ncol)
 end
 
 
+# ╔═╡ 702f99ea-3c58-4782-98dd-6dceddbf767c
+md"Para $k=5$:"
+
 # ╔═╡ 1bc17a9d-3252-4e6f-a373-b8457f209c99
-compare_initilizations(A1_obs, mask; k=5)
+compare_initilizations(matrix_ex1, mask_ex1; k=5, verbose=true)
+
+# ╔═╡ e17d5daf-2b19-4824-8040-7647e0d84477
+compare_initilizations(matrix_ex2, mask_ex2; k=5)
+
+# ╔═╡ b47f5bd3-bcd9-402a-8369-2ca651e3b666
+md"Para $k=30$:"
 
 # ╔═╡ 647fdaa6-0fb8-4aee-af48-2b6254a04552
-compare_initilizations(A1_obs, mask; k=30)
+compare_initilizations(matrix_ex1, mask_ex1; k=30)
+
+# ╔═╡ ba546705-6e36-4498-8a75-a0135d0f0187
+compare_initilizations(matrix_ex2, mask_ex2; k=30)
 
 # ╔═╡ 460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
 md"
 **Resultado:**
 
-Para $k=5$, la inicialización o no inicialización de la imagen no cambia mucho.
+Para $k=5$, en ambas imágenes la inicialización o no inicialización de la imagen no genera cambios remarcables.
 
 Para $k=30$, los huecos tienden al color de base, por lo que la imagen no inicializada es más claramente erronea. Sin embargo no se ven diferencias mayores entre los 3 métodos de inicialización, por lo que solo vamos a utilizar el global de ahora en adelante.
 "
@@ -450,24 +439,41 @@ md"
 ### Diferentes valores de k
 Queremos un mosaico que muestre las imágenes con k=5,10,20,40 por e.g.
 
-Un $k$ pequeño implica una imagen muy suavizada. Solo se preservan patrones globales y se pierde el detalle.
+Veremos si se cumple que:
+* Un $k$ pequeño implica una imagen muy suavizada. Solo se preservan patrones globales y se pierde el detalle.
 
-Un $k$ intermedio reconstruye patrones generales y algo de textura.
+* Un $k$ intermedio reconstruye patrones generales y algo de textura.
 
-Un $k$ grande preserva detalles finos, pero también amplifica errores si el daño es severo.
+* Un $k$ grande preserva detalles finos, pero también amplifica errores si el daño es severo.
 "
-
-# ╔═╡ 056f906e-3f34-4030-8ab7-a3f88496a44b
-A_global = initialize_missing(A1_obs, mask; method="global");
 
 # ╔═╡ fe9f245b-0c84-45ef-94da-bfc29e5c7b32
 mosaicview(
-	Gray.(svd_inpainting(A_global, mask, 5)),
-	Gray.(svd_inpainting(A_global, mask, 10)),
-	Gray.(svd_inpainting(A_global, mask, 30)),
-	Gray.(svd_inpainting(A_global, mask, 75));
-	ncol = 2
+	Gray.(svd_inpainting(init_ex1, mask_ex1, 5)),
+	Gray.(svd_inpainting(init_ex1, mask_ex1, 10)),
+	Gray.(svd_inpainting(init_ex1, mask_ex1, 30)),
+	Gray.(svd_inpainting(init_ex1, mask_ex1, 75));
+	ncol = 4
 )
+
+# ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
+mosaicview(
+	Gray.(svd_inpainting(init_ex2, mask_ex2, 5)),
+	Gray.(svd_inpainting(init_ex2, mask_ex2, 10)),
+	Gray.(svd_inpainting(init_ex2, mask_ex2, 30)),
+	Gray.(svd_inpainting(init_ex2, mask_ex2, 75));
+	ncol = 4
+)
+
+# ╔═╡ 82c49113-628d-43b5-a54f-8ebfa66e8261
+md"
+**Resultado**
+
+En efecto, $k$ se balancea entre ser muy suave (siguiendo los patrones generales más fuertes) y estar sobreajustado.
+
+En la imagen dañada artificialmente, que tiene daños redondeados y grandes, el valor mediano de $k=30$.
+En la imagen real, que tiene daños largos y lineares, los valores menores de $k=5,10$ actuaron mejor.
+"
 
 # ╔═╡ 297878d6-f1b2-4073-be73-a6030c9bc294
 md"
@@ -2424,34 +2430,32 @@ version = "1.9.2+0"
 # ╟─2812ab89-9954-412c-935e-5281ed29e7b8
 # ╟─8c798beb-8a08-426a-bd07-dd124b2add09
 # ╠═890a2834-49b6-4351-b3d9-f124e809322d
-# ╠═59bc0d60-cfbe-49e9-95e2-7e07c8c94af7
-# ╠═b4f8f1bc-7566-4f00-9398-39f282e92d32
 # ╟─6c71642a-b1e0-4866-b304-aec85e4d71f1
-# ╠═dfa2de65-b023-4c75-99bd-e714861ad46f
-# ╠═88441cf4-a3af-4ad6-b10f-9cb4f7a3024c
+# ╟─dfa2de65-b023-4c75-99bd-e714861ad46f
 # ╟─aa48a83d-6310-4713-9f9c-43644265bafd
 # ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
 # ╟─8558ba84-507e-4034-99fe-432afdc12087
 # ╠═dc78e695-4852-424e-ae63-34762cded85b
-# ╠═0d51d180-241a-4e5e-b543-fdef4a3ae321
 # ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
-# ╠═8ec4d0fe-f670-4cd6-9fc3-137497dea1a4
-# ╟─bfbb1d25-bff4-4e43-b95e-27a20a28e03f
-# ╠═252c7103-24e7-4bf8-9e17-372f9bde3fe2
-# ╠═830b8b01-d817-40d7-a040-e843b5b3864d
-# ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
-# ╟─f9739f4e-71cf-47b0-b193-bce281c5fee8
+# ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
+# ╠═72177df0-5329-4f71-88ce-25f6427aa8b8
 # ╟─18428c85-668c-45e4-ad6d-0e0d43b94be7
 # ╟─83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
 # ╟─120da197-8913-460e-86f7-24e51ad30edc
+# ╟─f9739f4e-71cf-47b0-b193-bce281c5fee8
 # ╠═a322892a-a789-4679-8639-a13b35884522
+# ╟─702f99ea-3c58-4782-98dd-6dceddbf767c
 # ╠═1bc17a9d-3252-4e6f-a373-b8457f209c99
+# ╠═e17d5daf-2b19-4824-8040-7647e0d84477
+# ╟─b47f5bd3-bcd9-402a-8369-2ca651e3b666
 # ╠═647fdaa6-0fb8-4aee-af48-2b6254a04552
+# ╠═ba546705-6e36-4498-8a75-a0135d0f0187
 # ╟─460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
 # ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
-# ╠═056f906e-3f34-4030-8ab7-a3f88496a44b
 # ╠═fe9f245b-0c84-45ef-94da-bfc29e5c7b32
+# ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
+# ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
 # ╟─297878d6-f1b2-4073-be73-a6030c9bc294
 # ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
 # ╟─00000000-0000-0000-0000-000000000001
