@@ -15,7 +15,7 @@ end
 
 # ╔═╡ cc79ca6a-6232-11f0-0def-2166b5607fa9
 md"
-# Aplicación práctica de la descomposición SVD
+# Inpainting con SVD
 
 ## Objetivos
 **General**
@@ -50,34 +50,9 @@ La restitución de imágenes incompletas, también conocida como inpainting o co
 En este notebook, exploraremos un enfoque clásico y eficiente basado en la descomposición en valores singulares (SVD). La idea fundamental es que muchas imágenes reales presentan una estructura redundante y pueden aproximarse por matrices de rango bajo. Esta propiedad se puede aprovechar para recuperar los valores faltantes buscando la mejor aproximación de rango bajo compatible con los datos observados.
 "
 
-# ╔═╡ 2812ab89-9954-412c-935e-5281ed29e7b8
-md"
-## Teoría
-### Rango de una matriz
-
-### Aproximación óptima mediante SVD
-#### Teorema de Eckart–Young: 
-
-La mejor aproximación de rango $k$ a $A$ en norma 2 (o Frobenius) es:
-
-$A_k = \sum_{i=1}^k \sigma_i u_i v_i^T$
-
-Y cumple:
-
-$\| A - A_k \|2 = \sigma{k+1}$
-
-$\| A - A_k \|F^2 = \sum{i = k+1}^r \sigma_i^2$
-
-Este resultado es importante en compresión de datos, ruido, y reducción de dimensionalidad.
-
-#### Interpretación
-
-El teorema dice que entre todas las matrices de rango $k$, la matriz $A_k$ minimiza la distancia a $A$ en términos de norma Frobenius y norma 2.
-"
-
 # ╔═╡ b9af3222-0516-4388-80c1-7af8a6356601
 md"
-## Planteamiento del problema de restitución
+### Planteamiento del problema de restitución
 
 Dado una imagen incompleta representada como una matriz $A_{\text{obs}} \in \mathbb{R}^{m \times n}$, queremos recuperar una aproximación de la imagen completa $A$.
 
@@ -101,9 +76,90 @@ Resolver el problema mediante un **método iterativo** basado en SVD, que recons
 
 "
 
+# ╔═╡ 2fd93cff-58b5-4199-bfa2-caf22e66969b
+md"
+
+## Teoría
+### Rango de una matriz
+
+El rango de una matriz corresponde al número máximo de columnas (o filas) linealmente independientes que tiene la matriz. Es una medida de la *dimensión* del espacio generado por sus columnas o filas.
+
+El rango de una matriz también corresponde al número de valores singulares no nulos de la matriz. Por lo que el rango de la matriz indica cuánta información relevante tiene la matriz.
+
+### Aproximación óptima mediante SVD
+
+**Teorema de Eckart–Young:** 
+
+La mejor aproximación de rango $k$ a $A$ en norma 2 (o Frobenius) es
+$A_k = \sum_{i=1}^k \sigma_i u_i v_i^T = U_k \sigma_k V_k^T$.
+
+**Interpretación:**
+
+El teorema dice que entre todas las matrices de rango $k$, la matriz $A_k$ minimiza la distancia a $A$ en términos de norma Frobenius y norma 2.
+
+"
+
+# ╔═╡ 2812ab89-9954-412c-935e-5281ed29e7b8
+md"
+### Inpainting iterativo por SVD
+
+El inpainting de imágenes consiste en reconstruir las partes faltantes o dañadas de una imagen utilizando la información existente en la misma.
+
+Este proceso se basa en la idea de que muchas imágenes (o matrices de datos) contienen información redundante y, por tanto, pueden representarse bien con una aproximación de bajo rango. Esto significa que los valores conocidos contienen suficiente estructura para predecir los valores faltantes.
+
+El problema se convierte entonces en un completado de matrices de rango bajo.
+
+**🔧 Máscara de observación**
+
+Para saber qué valores de la imagen se deben reconstruir, se utiliza una máscara binaria $M$:
+
+* Si el píxel (i,j)(i,j) es conocido, $M[i,j]=1$.
+
+* Si el píxel (i,j)(i,j) es faltante (se debe reconstruir), $M[i,j]=0$.
+
+**🔄 Esquema del algoritmo iterativo:**
+
+Se realiza un proceso iterativo donde se alterna entre:
+
+* Aproximar la imagen incompleta mediante una matriz de rango bajo usando SVD truncado.
+
+* Restaurar los valores conocidos en cada iteración para respetar los datos originales.
+
+#### 📝 Algoritmo paso a paso
+
+Recibe una imagen $A$, una máscara $M$, un rango máximo $k$ y un máximo de iteraciones $max\_iter$.
+
+1. **Inicialización**:
+   Comenzar con una copia $A_{\text{rec}}$ de la imagen $A$. Los valores faltantes pueden inicializarse arbitrariamente (por ejemplo, en cero).
+
+2. **Repetir hasta alcanzar el número máximo de iteraciones**:
+
+   a. **Descomposición SVD**:
+   Obtener la descomposición en valores singulares de la matriz actual $A_{\text{rec}}$:
+
+   $A_{\text{rec}} = U \Sigma V^T$
+
+   b. **Truncado de valores singulares**:
+   Conservar solo los $k$ valores singulares más grandes en $\Sigma$. El resto se remplaza por ceros.
+
+   c. **Reconstrucción de rango bajo**:
+   Construir la matriz aproximada de rango $k$:
+
+   $A_{\text{lowrank}} = U_k \Sigma_k V_k^T$
+
+   d. **Actualización de los valores faltantes**:
+   Actualizar los valores de $A_{\text{rec}}$:
+
+   * Los **píxeles conocidos** se mantienen igual (se respetan los datos originales).
+   * Los **píxeles faltantes** se completan con los valores de $A_{\text{lowrank}}$.
+
+3. **Resultado final**:
+   La matriz $A_{\text{rec}}$ contiene la imagen reconstruida tras las iteraciones.
+"
+
 # ╔═╡ 8c798beb-8a08-426a-bd07-dd124b2add09
 md"
-## Algoritmo e implementación
+## Implementación
 1. Cargar la imagen y convertir a escala de grises
 2. Generar máscara de observación
 3. Aplicar algoritmo de in-painting por SVD
@@ -281,14 +337,16 @@ md"
 "
 
 # ╔═╡ 252c7103-24e7-4bf8-9e17-372f9bde3fe2
-function compare(image_name; threshold=.9, k = 10)
+function compare(image_name; threshold=.9, k = 10, max_iter = 30)
 	img_real = Float64.(Gray.(load(image_name)))
 	mask_real = generate_mask(img_real, threshold)
+	img_init = initialize_missing(img_real, mask_real; method="global")
 	mosaicview(
 		Gray.(mask_real), 
-		Gray.(img_real), 
-		Gray.(svd_inpainting(img_real, mask_real, k)); 
-		ncol=3
+		Gray.(svd_inpainting(img_init, mask_real, k, max_iter)),
+		Gray.(img_real),
+		Gray.(svd_inpainting(img_real, mask_real, k, max_iter)); 
+		ncol=2
 	)
 end
 
@@ -2361,8 +2419,9 @@ version = "1.9.2+0"
 # ╔═╡ Cell order:
 # ╟─cc79ca6a-6232-11f0-0def-2166b5607fa9
 # ╟─36313e11-d39d-4688-969f-a217a87ba03a
-# ╟─2812ab89-9954-412c-935e-5281ed29e7b8
 # ╟─b9af3222-0516-4388-80c1-7af8a6356601
+# ╟─2fd93cff-58b5-4199-bfa2-caf22e66969b
+# ╟─2812ab89-9954-412c-935e-5281ed29e7b8
 # ╟─8c798beb-8a08-426a-bd07-dd124b2add09
 # ╠═890a2834-49b6-4351-b3d9-f124e809322d
 # ╠═59bc0d60-cfbe-49e9-95e2-7e07c8c94af7
