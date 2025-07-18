@@ -404,13 +404,57 @@ A_global = initialize_missing(A1_obs, mask; method="global");
 
 # ╔═╡ fe9f245b-0c84-45ef-94da-bfc29e5c7b32
 mosaicview(
+	Gray.(svd_inpainting(A_global, mask, 5)),
 	Gray.(svd_inpainting(A_global, mask, 10)),
 	Gray.(svd_inpainting(A_global, mask, 30)),
-	Gray.(svd_inpainting(A_global, mask, 50)),
-	Gray.(svd_inpainting(A_global, mask, 75)),
-	Gray.(svd_inpainting(A_global, mask, 200));
-	ncol = 1
+	Gray.(svd_inpainting(A_global, mask, 75));
+	ncol = 2
 )
+
+# ╔═╡ 297878d6-f1b2-4073-be73-a6030c9bc294
+md"
+## Reflexión y aprendizajes
+
+El principal aprendizaje que me dejó este notebook fue el de cambiar de enfoque o de tarea cuando me encuentro bloqueada con algún problema.  
+Trabajar de forma modular y avanzar en otras partes del proyecto mientras maduro una idea resultó ser una estrategia muy útil.
+
+El proyecto me permitió ver la importancia de la matriz SVD al ver cómo captura globalmente la información de una matriz. Además pude aplicar de forma práctica el teorema de las aproximaciones óptimas del SVD.
+"
+
+# ╔═╡ 8dd2bede-9731-4b8f-86a5-41d44e9d57af
+md"""
+
+## Declaración sobre el uso de inteligencia artificial y fuentes externas
+
+Durante la realización de este trabajo se utilizó **asistencia de inteligencia artificial (IA)** para generar y mejorar partes del código y de los textos explicativos, con el fin de estructurar mejor el contenido y optimizar la implementación.
+
+### Uso de IA:
+
+Se utilizó **ChatGPT (OpenAI)** de forma activa para:
+
+* Redacción y revisión de objetivos, introducción y estructura del notebook.
+* Comprensión de conceptos y algoritmos.
+* Generación y refactorización de código en Julia, en particular:
+
+  * **Inicialización de valores faltantes con medias locales.**
+  * **Algoritmo iterativo de SVD inpainting.**
+  * **Construcción de funciones modulares para comparación entre métodos.**
+  * **Visualización de resultados con etiquetas usando `mosaicview` y `Luxor.jl`.**
+
+**Algunos prompts utilizados:**
+
+* "Puedes explicarme el teorema de Eckart-Young?"
+* “Explicame el algoritmo de inpainting por SVD.”
+* “Quiero imprimir un mosaico de restituciones usando el método de inicialización global para diferentes valores de k.”
+
+---
+
+### Fuentes externas consultadas:
+
+* Marangoz, S. (2023). *Image Imputation with SVD*. [https://salihmarangoz.github.io/blog/Image-Imputation-with-SVD](https://salihmarangoz.github.io/blog/Image-Imputation-with-SVD)
+* Golub, G., & Van Loan, C. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.
+
+"""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2349,5 +2393,7 @@ version = "1.9.2+0"
 # ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 # ╠═056f906e-3f34-4030-8ab7-a3f88496a44b
 # ╠═fe9f245b-0c84-45ef-94da-bfc29e5c7b32
+# ╟─297878d6-f1b2-4073-be73-a6030c9bc294
+# ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
