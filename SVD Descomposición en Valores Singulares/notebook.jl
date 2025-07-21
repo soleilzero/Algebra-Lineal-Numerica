@@ -376,6 +376,12 @@ end
 # ╔═╡ beac433a-c1f4-4191-899f-6eb37d929889
 example = randn(5, 4)
 
+# ╔═╡ 8138c8bb-ca12-492c-9e78-f88c692f9538
+begin
+	square_bidiagonal_example = bidiagonalize_householder(randn(10, 10))[1]
+	force_bidiagonal!(square_bidiagonal_example)
+end
+
 # ╔═╡ aab73b0c-4d6e-467e-aaf8-93d8456508bc
 md"
 ### SVD nativo de Julia
@@ -399,6 +405,11 @@ validate_svd(example, F1)
 
 # ╔═╡ b6b0df75-1ffa-44bb-9b74-518bb918e8ab
 md"### Método ingenuo"
+
+# ╔═╡ af80df53-340d-419d-aa6a-9bea98050ca7
+# utilizar ortogonalización y iteración QR propio (en classroom - matrices simétricas)
+# dos formas: con A_TA y la otra, por bloques 2x2 con primer bloque siendo [0 A // A^T 0]
+# en ambas calcular los valores propios de la matriz
 
 # ╔═╡ 5655e762-fc65-48da-a4d8-9bbf0cf5e3fc
 """
@@ -589,6 +600,52 @@ function validate_shift(dm, fm, dn)
 end
 
 
+# ╔═╡ 09168c5e-1192-41cd-a610-2152a688d90f
+"""
+Valida un paso o una iteración completa del algoritmo de Golub–Kahan.
+
+Recibe:
+- B0: una matriz bidiagonal cuadrada (o vectores d, f)
+- método::Symbol: :step_matrix, :matrix, o :step_vector
+Aplica la transformación y reporta:
+- Si se mantiene la bidiagonalidad
+- Si se reduce la superdiagonal
+- Si se conserva la norma de BᵗB
+"""
+function validate_bidiagonal_svd_step(B0::Matrix{Float64}, fun::Function)
+    B = copy(B0)
+    n = size(B, 1)
+    @assert size(B,2) == n "B debe ser cuadrada"
+
+    A0 = B' * B
+	λ0 = eigen(Symmetric(A0)).values
+    f_before = [B[i, i+1] for i in 1:n-1]
+
+    if fun == golub_kahan_svd_step_vector!
+        d = diag(B)
+        f = [B[i, i+1] for i in 1:n-1]
+        golub_kahan_svd_step_vector!(d, f)
+        B .= build_bidiagonal(d, f)  # reconstruir B
+
+    else
+        fun(B)
+    end
+
+    A1 = B' * B
+	λ1 = eigen(Symmetric(A1)).values
+    f_after = [B[i, i+1] for i in 1:n-1]	
+
+	println()
+	println("Método: ", fun)
+    println("¿Todavía es bidiagonal?: ", is_bidiagonal(B))
+	display(B)
+    println("Reducción superdiagonal: ", norm(f_before) > norm(f_after))
+    println("‖BᵗB‖₂ antes: ", norm(A0), " — después: ", norm(A1))
+    println("‖BᵗB - nuevo‖: ", norm(A1 - A0))
+	println("Diferencia en autovalores de BᵗB: ", norm(sort(λ0) - sort(λ1)))
+end
+
+
 # ╔═╡ 3069c786-0823-42a0-92c0-4df61174e5d1
 md"
 Podemos ver que los autovalores parecen conservarse en las validaciones de `golub_kahan_svd_step_matrix` y `golub_kahan_svd_matrix`. Sin embargo la norma del error es demasiado grande. Esto nos dice que no es un problema de la lógica del algoritmo, sino de su implementación.
@@ -684,6 +741,17 @@ function GKalg!(B::Matrix{Float64}; tol=1e-12, maxiter=1000)
     end
 
     return B
+end
+
+# ╔═╡ 13f39950-32d3-428f-a33b-71dae23be7ac
+begin
+	println("Estado")
+	@show is_bidiagonal(square_bidiagonal_example)
+	#validate_bidiagonal_svd_step(square_bidiagonal_example,golub_kahan_svd_step_matrix!)
+	validate_bidiagonal_svd_step(square_bidiagonal_example,GKStep)
+	validate_bidiagonal_svd_step(square_bidiagonal_example,GKalg!)
+	# validate_bidiagonal_svd_step(square_bidiagonal_example,:matrix)
+	# validate_bidiagonal_svd_step(square_bidiagonal_example,:step_vector)
 end
 
 # ╔═╡ adba5d98-0080-4d56-81ca-897d8a97eb39
@@ -827,6 +895,40 @@ end
 # ╔═╡ 8b74dc98-40e2-4a55-b98c-363910221ed4
 md"#### Alternativa implícita"
 
+# ╔═╡ 56c579f8-939f-445a-aae2-098e944c56f7
+"""
+Aplica un paso Golub–Kahan a vectores bidiagonales d y f in-place.
+Modifica directamente los vectores d y f.
+"""
+function golub_kahan_svd_step_vector!(d::Vector{Float64}, f::Vector{Float64})
+    n = length(d)
+    @assert length(f) == n - 1 "Longitud de f debe ser n-1"
+
+    # Calcular shift de Wilkinson
+    μ = wilkinson_shift(d[end-1], f[end], d[end])
+
+    # Vector inicial (y, z) para la primera rotación
+    y = d[1]^2 - μ
+    z = d[1] * f[1]
+
+    for k in 1:n-1
+        # Rotación por la derecha
+        c, s = givens_rotation(y, z)
+        apply_right_rotation!(d, f, k, c, s)
+
+        # Rotación por la izquierda
+        c, s = givens_rotation(d[k], d[k+1])
+        apply_left_rotation!(d, k, c, s)
+
+        # Preparar siguiente (y, z)
+        if k < n - 1
+            y = f[k]
+            z = f[k+1]
+        end
+    end
+end
+
+
 # ╔═╡ 04eb9c27-8a4f-462e-930a-4f643d424769
 md"#### Algoritmo de Golub Kahan"
 
@@ -865,12 +967,6 @@ function bidiagonalize_householder(A::Matrix{Float64})
 end
 
 
-# ╔═╡ 8138c8bb-ca12-492c-9e78-f88c692f9538
-begin
-	square_bidiagonal_example = bidiagonalize_householder(randn(10, 10))[1]
-	force_bidiagonal!(square_bidiagonal_example)
-end
-
 # ╔═╡ c1a1f0f7-39a9-4597-9c1e-3358b0ee232d
 begin
 	Y = randn(5, 3)
@@ -897,6 +993,46 @@ begin
 	
 	@show is_bidiagonal(B)
 end
+
+# ╔═╡ a48dea5f-3e17-45d2-9a07-7eb0228ca516
+"""
+Diagonaliza la matriz bidiagonal B utilizando rotaciones de Givens
+y acumula las transformaciones en U y V.
+Modifica B, U y V in-place.
+"""
+function diagonalize_bidiagonal!(B::Matrix{Float64}, U::Matrix{Float64}, V::Matrix{Float64};
+                                  tol=1e-12, maxiter=1000)
+
+    m, n = size(B)
+    for iter = 1:maxiter
+        converged = true
+
+        for i in 1:n-1
+            # Verifica si el elemento fuera de la diagonal es significativo
+            if abs(B[i, i+1]) > tol * (abs(B[i,i]) + abs(B[i+1,i+1]))
+                converged = false
+
+                # Paso 1: rotación a la derecha (columna i e i+1 de B y V)
+                x = B[i,i]^2 - B[i+1,i+1]^2
+                y = B[i,i] * B[i,i+1]
+                c, s = givens_rotation(x, y)
+
+                apply_right_rotation!(B, i, i+1, c, s)
+                apply_right_rotation!(V, i, i+1, c, s)
+
+                # Paso 2: rotación a la izquierda (fila i e i+1 de B y U)
+                c, s = givens_rotation(B[i,i], B[i+1,i])
+                apply_left_rotation!(B, i, i+1, c, s)
+                apply_right_rotation!(U, i, i+1, c, s)
+            end
+        end
+
+        if converged
+            break
+        end
+    end
+end
+
 
 # ╔═╡ 65aa59c8-586f-4850-875c-7a19ed968882
 """
@@ -957,137 +1093,6 @@ function apply_left_rotation!(d, k::Int, c::Float64, s::Float64)
     d_k1 = d[k+1]
     d[k]   =  c * d_k + s * d_k1
     d[k+1] = -s * d_k + c * d_k1
-end
-
-
-# ╔═╡ 56c579f8-939f-445a-aae2-098e944c56f7
-"""
-Aplica un paso Golub–Kahan a vectores bidiagonales d y f in-place.
-Modifica directamente los vectores d y f.
-"""
-function golub_kahan_svd_step_vector!(d::Vector{Float64}, f::Vector{Float64})
-    n = length(d)
-    @assert length(f) == n - 1 "Longitud de f debe ser n-1"
-
-    # Calcular shift de Wilkinson
-    μ = wilkinson_shift(d[end-1], f[end], d[end])
-
-    # Vector inicial (y, z) para la primera rotación
-    y = d[1]^2 - μ
-    z = d[1] * f[1]
-
-    for k in 1:n-1
-        # Rotación por la derecha
-        c, s = givens_rotation(y, z)
-        apply_right_rotation!(d, f, k, c, s)
-
-        # Rotación por la izquierda
-        c, s = givens_rotation(d[k], d[k+1])
-        apply_left_rotation!(d, k, c, s)
-
-        # Preparar siguiente (y, z)
-        if k < n - 1
-            y = f[k]
-            z = f[k+1]
-        end
-    end
-end
-
-
-# ╔═╡ 09168c5e-1192-41cd-a610-2152a688d90f
-"""
-Valida un paso o una iteración completa del algoritmo de Golub–Kahan.
-
-Recibe:
-- B0: una matriz bidiagonal cuadrada (o vectores d, f)
-- método::Symbol: :step_matrix, :matrix, o :step_vector
-Aplica la transformación y reporta:
-- Si se mantiene la bidiagonalidad
-- Si se reduce la superdiagonal
-- Si se conserva la norma de BᵗB
-"""
-function validate_bidiagonal_svd_step(B0::Matrix{Float64}, fun::Function)
-    B = copy(B0)
-    n = size(B, 1)
-    @assert size(B,2) == n "B debe ser cuadrada"
-
-    A0 = B' * B
-	λ0 = eigen(Symmetric(A0)).values
-    f_before = [B[i, i+1] for i in 1:n-1]
-
-    if fun == golub_kahan_svd_step_vector!
-        d = diag(B)
-        f = [B[i, i+1] for i in 1:n-1]
-        golub_kahan_svd_step_vector!(d, f)
-        B .= build_bidiagonal(d, f)  # reconstruir B
-
-    else
-        fun(B)
-    end
-
-    A1 = B' * B
-	λ1 = eigen(Symmetric(A1)).values
-    f_after = [B[i, i+1] for i in 1:n-1]	
-
-	println()
-	println("Método: ", fun)
-    println("¿Todavía es bidiagonal?: ", is_bidiagonal(B))
-	display(B)
-    println("Reducción superdiagonal: ", norm(f_before) > norm(f_after))
-    println("‖BᵗB‖₂ antes: ", norm(A0), " — después: ", norm(A1))
-    println("‖BᵗB - nuevo‖: ", norm(A1 - A0))
-	println("Diferencia en autovalores de BᵗB: ", norm(sort(λ0) - sort(λ1)))
-end
-
-
-# ╔═╡ 13f39950-32d3-428f-a33b-71dae23be7ac
-begin
-	println("Estado")
-	@show is_bidiagonal(square_bidiagonal_example)
-	#validate_bidiagonal_svd_step(square_bidiagonal_example,golub_kahan_svd_step_matrix!)
-	validate_bidiagonal_svd_step(square_bidiagonal_example,GKStep)
-	validate_bidiagonal_svd_step(square_bidiagonal_example,GKalg!)
-	# validate_bidiagonal_svd_step(square_bidiagonal_example,:matrix)
-	# validate_bidiagonal_svd_step(square_bidiagonal_example,:step_vector)
-end
-
-# ╔═╡ a48dea5f-3e17-45d2-9a07-7eb0228ca516
-"""
-Diagonaliza la matriz bidiagonal B utilizando rotaciones de Givens
-y acumula las transformaciones en U y V.
-Modifica B, U y V in-place.
-"""
-function diagonalize_bidiagonal!(B::Matrix{Float64}, U::Matrix{Float64}, V::Matrix{Float64};
-                                  tol=1e-12, maxiter=1000)
-
-    m, n = size(B)
-    for iter = 1:maxiter
-        converged = true
-
-        for i in 1:n-1
-            # Verifica si el elemento fuera de la diagonal es significativo
-            if abs(B[i, i+1]) > tol * (abs(B[i,i]) + abs(B[i+1,i+1]))
-                converged = false
-
-                # Paso 1: rotación a la derecha (columna i e i+1 de B y V)
-                x = B[i,i]^2 - B[i+1,i+1]^2
-                y = B[i,i] * B[i,i+1]
-                c, s = givens_rotation(x, y)
-
-                apply_right_rotation!(B, i, i+1, c, s)
-                apply_right_rotation!(V, i, i+1, c, s)
-
-                # Paso 2: rotación a la izquierda (fila i e i+1 de B y U)
-                c, s = givens_rotation(B[i,i], B[i+1,i])
-                apply_left_rotation!(B, i, i+1, c, s)
-                apply_right_rotation!(U, i, i+1, c, s)
-            end
-        end
-
-        if converged
-            break
-        end
-    end
 end
 
 
@@ -1234,7 +1239,8 @@ version = "5.11.0+0"
 # ╟─c7b2ba31-3e8a-4c66-8583-d7817bf53e1b
 # ╟─d804ab81-03bb-4770-a508-d58dc204de2b
 # ╟─b6b0df75-1ffa-44bb-9b74-518bb918e8ab
-# ╟─5655e762-fc65-48da-a4d8-9bbf0cf5e3fc
+# ╠═af80df53-340d-419d-aa6a-9bea98050ca7
+# ╠═5655e762-fc65-48da-a4d8-9bbf0cf5e3fc
 # ╟─59f9f7e8-f355-40a3-94e0-5cb3c6dec15d
 # ╟─40a0849e-6ad5-4b70-b708-5cb1d92ed578
 # ╟─6363a2cf-a7bf-475b-8f9c-0de2c5c66697
