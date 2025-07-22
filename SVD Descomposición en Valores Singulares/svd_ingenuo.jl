@@ -121,11 +121,30 @@ Idea: usar error contra svd normal
 # ╔═╡ 33b3d729-7315-4c60-9854-48d9a246cd32
 s1=svd(A)
 
+# ╔═╡ b3b5bc5b-c93d-4f92-9d89-33165587bf1e
+md"
+Para el método `svd` de Julia:
+el error de reconstrucción teniendo en cuenta que V es no transpuesta corresponde al error de máquina.
+"
+
 # ╔═╡ 578c849f-0760-41a6-b6f2-0a225afddeb8
 validate_svd(A, s1)
 
 # ╔═╡ 8c02d86c-9479-4df8-a94f-8489406a5356
 validate_svd(A, s1; V_transposed=true)
+
+# ╔═╡ 318ce551-45b6-4d04-ba66-4d622051807d
+md"
+Para el método `svd_via_ata` en el cual implementados el algoritmo SVD con el algoritmo QR de Julia, el error es de más de una unidad incluso si se tiene en cuenta que V no está transpuesta.
+"
+
+# ╔═╡ fa7fafbc-04d3-4c69-9aad-4ee86fcffba6
+md"
+Para el método `naiveSVD_classic_` en el cual implementados el algoritmo SVD con el algoritmo QR dado en clase, el error es de aproximadamente $5*10^{-1}$ incluso si se tiene en cuenta que V no está transpuesta.
+"
+
+# ╔═╡ b460bc19-8641-47ba-89e6-06faf66f53ac
+md"Y para matrices grandes, toma bastante tiempo"
 
 # ╔═╡ 41c1603c-6101-4bee-b66a-3f88dacce14d
 md"### SVD de Julia"
@@ -454,16 +473,21 @@ begin
 	    end
 	    return H, Q
 	end
-end
+	
+	function naiveSVD_classic_(A::Matrix{Float64})
+	    C = transpose(A) * A
+	    T, V = RealSchur_(C)
+	    λ = diag(T)
+	    σ = sqrt.(abs.(λ))
+	    orden = sortperm(σ, rev=true)
+	    σ = σ[orden]
+	    V = V[:, orden]
+	    AV = A * V
+	    U, _, _ = QRPivotado_(AV)
+	    return SVDReconstruction(U, σ, V)
+	end
 
-# ╔═╡ 042dcfd5-d944-417d-a18a-ed982874c185
-Diagonal(RealSchur_(C)[1])
-
-# ╔═╡ 21095a5d-1f28-4c4c-a134-e2a83e20573d
-RealSchur_(C)[2]
-
-# ╔═╡ cea1de1a-3a88-4eb4-b8fb-ac9e65eb56d6
-function QRPivotado_(A::Matrix{Float64})
+	function QRPivotado_(A::Matrix{Float64})
 	    m, n = size(A)
 	    Q = zeros(m, n)
 	    R = zeros(n, n)
@@ -488,20 +512,7 @@ function QRPivotado_(A::Matrix{Float64})
 	
 	    return Q, R, P
 	end	
-
-# ╔═╡ dcbd66b1-e3e9-4988-8785-e94219d56e32
-function naiveSVD_classic_(A::Matrix{Float64})
-	    C = transpose(A) * A
-	    T, V = RealSchur_(C)
-	    λ = diag(T)
-	    σ = sqrt.(abs.(λ))
-	    orden = sortperm(σ, rev=true)
-	    σ = σ[orden]
-	    V = V[:, orden]
-	    AV = A * V
-	    U, _, _ = QRPivotado_(AV)
-	    return SVDReconstruction(U, σ, V)
-	end
+end
 
 # ╔═╡ 6f6f3e46-7164-4200-88fb-3a437543986f
 s3=naiveSVD_classic_(A)
@@ -511,6 +522,18 @@ validate_svd(A, s3)
 
 # ╔═╡ 5e2753e3-bb12-442c-992e-0ac11a147f57
 validate_svd(A, s3; V_transposed=true)
+
+# ╔═╡ 82d13c2a-f64d-447a-9b4b-371f2d3d50c2
+begin
+	D=rand(500,500)
+	s4=naiveSVD_classic_(D)
+end
+
+# ╔═╡ 042dcfd5-d944-417d-a18a-ed982874c185
+Diagonal(RealSchur_(C)[1])
+
+# ╔═╡ 21095a5d-1f28-4c4c-a134-e2a83e20573d
+RealSchur_(C)[2]
 
 # ╔═╡ 9779b71a-60cf-4a6d-8337-7d4421a9d8fe
 eigen(C)
@@ -576,17 +599,22 @@ version = "5.11.0+0"
 # ╠═88697440-08ac-4748-8224-863ede4a8a22
 # ╠═f479bb41-5a99-424c-9aab-121ef5b6b51e
 # ╠═c4c38a38-9298-4cda-998e-03f4610cd33a
-# ╠═bccf578b-da57-4df2-b5cb-cf5a95c80ff4
+# ╟─bccf578b-da57-4df2-b5cb-cf5a95c80ff4
 # ╠═33b3d729-7315-4c60-9854-48d9a246cd32
 # ╠═df587928-e939-4d20-a959-eb4128980bed
 # ╠═6f6f3e46-7164-4200-88fb-3a437543986f
+# ╟─b3b5bc5b-c93d-4f92-9d89-33165587bf1e
 # ╠═578c849f-0760-41a6-b6f2-0a225afddeb8
 # ╠═8c02d86c-9479-4df8-a94f-8489406a5356
+# ╟─318ce551-45b6-4d04-ba66-4d622051807d
 # ╠═210b22b9-13e6-4d29-a1f4-6d0e85bf45a6
 # ╠═83cb9d8a-b759-473e-9d2e-52b6fb5f2054
+# ╠═fa7fafbc-04d3-4c69-9aad-4ee86fcffba6
 # ╠═c80c0ecf-1b44-445f-a990-d044e4d4280c
 # ╠═5e2753e3-bb12-442c-992e-0ac11a147f57
-# ╠═41c1603c-6101-4bee-b66a-3f88dacce14d
+# ╟─b460bc19-8641-47ba-89e6-06faf66f53ac
+# ╠═82d13c2a-f64d-447a-9b4b-371f2d3d50c2
+# ╟─41c1603c-6101-4bee-b66a-3f88dacce14d
 # ╠═7618b8dc-1f91-40a3-9ea3-a8248b9efe28
 # ╟─7066f320-5339-40db-bdda-1e1c396e6fc1
 # ╠═293b240e-fd3b-48e4-ba3c-d5e337fd4d2f
@@ -611,11 +639,9 @@ version = "5.11.0+0"
 # ╠═17ff8c7b-b0aa-4490-8d53-20eb82e9764d
 # ╟─ce61ed2c-354e-461b-b654-aaf02202fc7e
 # ╠═596ea23f-236c-4abf-8c06-1e3682bc94dd
-# ╠═79b9956c-b3b5-4747-b919-dd4b9fc604bb
+# ╟─79b9956c-b3b5-4747-b919-dd4b9fc604bb
 # ╟─491e85bc-2104-4908-8797-194c89cf1f7f
 # ╠═b0355544-b0a6-4f00-9381-cdddcc982b91
-# ╠═cea1de1a-3a88-4eb4-b8fb-ac9e65eb56d6
-# ╠═dcbd66b1-e3e9-4988-8785-e94219d56e32
 # ╠═9779b71a-60cf-4a6d-8337-7d4421a9d8fe
 # ╠═3c82519a-9c07-49b8-a0b8-ba7d895077af
 # ╠═ea15f2f1-82c2-4060-9855-09eb495a56c6
