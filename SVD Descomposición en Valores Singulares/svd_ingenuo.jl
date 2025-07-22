@@ -132,6 +132,7 @@ Imprime la norma del error ‖A - UΣVᵀ‖₂.
 function validate_svd(A::Matrix{Float64}, F; V_transposed=false)
     A_hat = reconstruct_from_svd(F;V_transposed=V_transposed)
     error = norm(A - A_hat)
+	display(A_hat)
     println("Error de reconstrucción ‖A - UΣVᵀ‖₂ = ", error)
 	#println("Error de Frobenius ‖A - UΣVᵀ‖₂ = ", relative_frobenius_error(A,A_hat))
 
@@ -154,10 +155,7 @@ el error de reconstrucción teniendo en cuenta que V es no transpuesta correspon
 "
 
 # ╔═╡ 578c849f-0760-41a6-b6f2-0a225afddeb8
-validate_svd(A, s1)
-
-# ╔═╡ 8c02d86c-9479-4df8-a94f-8489406a5356
-validate_svd(A, s1; V_transposed=true)
+validate_svd(A, s1) #sirve
 
 # ╔═╡ 318ce551-45b6-4d04-ba66-4d622051807d
 md"
@@ -169,11 +167,26 @@ md"
 Para el método `naiveSVD_classic_` en el cual implementados el algoritmo SVD con el algoritmo QR dado en clase, el error es de aproximadamente $5*10^{-1}$ incluso si se tiene en cuenta que V no está transpuesta.
 "
 
+# ╔═╡ a0236861-049d-40c3-9069-70029c13bc69
+md"Para V_transposed=true ninguna sirve..."
+
+# ╔═╡ 8c02d86c-9479-4df8-a94f-8489406a5356
+validate_svd(A, s1; V_transposed=true) #no sirve
+
 # ╔═╡ b460bc19-8641-47ba-89e6-06faf66f53ac
 md"Y para matrices grandes, toma bastante tiempo"
 
+# ╔═╡ 82d13c2a-f64d-447a-9b4b-371f2d3d50c2
+begin
+	D=rand(500,500)
+	#s4=naiveSVD_classic_(D)
+end
+
 # ╔═╡ 41c1603c-6101-4bee-b66a-3f88dacce14d
 md"### SVD de Julia"
+
+# ╔═╡ a4858212-5dd0-406a-ac48-314dbb539517
+svd
 
 # ╔═╡ 7618b8dc-1f91-40a3-9ea3-a8248b9efe28
 begin
@@ -243,22 +256,51 @@ md"#### Paso 2: Descomposición de Schur"
 md"Utilizamos la descomposición de Schur para obtener los autovalores y los autovectores ($V$) de $C$, veamos que funciona en un ejemplo:"
 
 # ╔═╡ 9e7998ae-f91b-424b-bca8-05fcd71064ec
-md"**Autovalores:**"
+md"
+**Autovalores:**
+
+Comparemos 3 métodos diferentes para obtener los autovalores: el de Julia, El del notebook `RealSchur` y el adaptado `RealSchur_` para devolver también $V$.
+
+Podemos ver que el original `RealSchur` es mucho más preciso que el adaptado
+"
 
 # ╔═╡ ce85b232-ec3d-4d1c-84d5-420f9911ac24
-eigen(Symmetric(C)).values
+sort(eigen(Symmetric(C)).values, rev=true)
 
 # ╔═╡ e8606e61-cbaf-4062-8c4f-abb653737919
-md"**Autovectores**"
+md"
+**Autovectores**
+
+Ahora comparemos dos métodos para obtener autovectores: el método propio de Julia con `RealSchur_`. Podemos ver que los resultados no son cercanos
+"
 
 # ╔═╡ b88b2e64-6c79-461c-a89e-ee816bd4a2ba
 eigen(Symmetric(C)).vectors
 
+# ╔═╡ 1e0bd262-f985-44c9-8e4f-136fc43b6390
+md"**HessenbergQR**"
+
 # ╔═╡ e2df08c4-245e-48d8-b680-539d9b12adda
 md"Ahora veamos el código:"
 
-# ╔═╡ 9745ad15-080c-493e-9c5e-3a88aebf1068
-function Housev(x)
+# ╔═╡ b32ef216-4e64-44aa-9e84-1bedbccabac3
+begin
+	function HessenbergForm(A)
+	    n = size(A)[1]
+	    H = copy(A)
+	    U = Matrix(1.0*I, n, n)
+	    for k = 1:n-2
+	        v, β = Housev(H[k+1:n, k])
+	        H[k+1:n, k:n] = (I - β*v*v')*H[k+1:n, k:n]
+	        H[1:n, k+1:n] = H[1:n, k+1:n]*(I - β*v*v')
+	        
+	        #U es necesaria para la verificar que la función devuelve los resultados correctos
+	        U[1:n, k+1:n] = U[1:n, k+1:n]*(I - β*v*v') 
+	    end
+	    return H, U
+	end
+	
+	function Housev(x)
     n = length(x)
     v = ones(size(x))
     v[2:n] = x[2:n]
@@ -277,106 +319,60 @@ function Housev(x)
     end
     return v, β
 end
-
-# ╔═╡ b32ef216-4e64-44aa-9e84-1bedbccabac3
-begin
-	function HessenbergForm(A)
-    n = size(A)[1]
-    H = copy(A)
-    U = Matrix(1.0*I, n, n)
-    for k = 1:n-2
-        v, β = Housev(H[k+1:n, k])
-        H[k+1:n, k:n] = (I - β*v*v')*H[k+1:n, k:n]
-        H[1:n, k+1:n] = H[1:n, k+1:n]*(I - β*v*v')
-        
-        #U es necesaria para la verificar que la función devuelve los resultados correctos
-        U[1:n, k+1:n] = U[1:n, k+1:n]*(I - β*v*v') 
-    end
-    return H, U
-end
 end
 
-# ╔═╡ 5a22a26a-1e35-4200-b5b1-4462e4878b74
-function Givens(a,b)
-    if b==0
-        c = 1
-        s = 0
-    else
-        if abs(b)>abs(a)
-            τ=-a/b
-            s=-1/sqrt(1+τ^2)
-            c=s*τ
-        else
-            τ=-b/a
-            c=1/sqrt(1+τ^2)
-            s=c*τ
-        end
-    end
-    return c,s
-end
+# ╔═╡ af05a8ab-8a80-49c3-b5c9-78a80d257490
+H, Q = HessenbergForm(A)
 
-# ╔═╡ 469bb3f0-bdc9-46a5-b3ab-73149ddf9bbd
-function RealSchurEig(C::Matrix{Float64}, iteraciones::Int = 10000)
-    H, Q = HessenbergForm(C)  # Q inicial de Householder
-    n = size(C, 1)
-
-    for k = 1:iteraciones
-        Cg, Sg = zeros(n-1), zeros(n-1)
-        # Aplicamos rotaciones de Givens
-        for i = 1:n-1
-            c, s = Givens(H[i, i], H[i+1, i])
-            G = [c -s; s c]
-            H[i:i+1, i:end] = G * H[i:i+1, i:end]
-            H[1:end, i:i+1] = H[1:end, i:i+1] * G'
-
-            # Acumulamos la rotación en Q
-            Q[:, i:i+1] = Q[:, i:i+1] * G'
-        end
-    end
-
-    return H, Q  # H tiene los autovalores, Q tiene los autovectores
-end
-
+# ╔═╡ 6a3a3959-b7aa-4a07-82ba-7be858463acc
+HessenbergQR_(H, Q)
 
 # ╔═╡ 9affa8ea-51cd-4a7b-95e4-e79eedd291fa
 begin
-	function HessenbergQR(H)
-    n = size(H)[1]
-    H2 = copy(H)
-    C, S = zeros(n-1), zeros(n-1)
-    
-    #Factorización QR de H
-    for k = 1:n-1
-        C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
-        H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
-        H2[k+1,k] = 0
-        #display([C[k] S[k]])
-    end
-    
-    #Matriz RQ
-    for k = 1:n-1
-        H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
-    end
-    
-    return H2 #RQ Hessenberg superior
-end
+	function Givens(a,b)
+	    if b==0
+	        c = 1
+	        s = 0
+	    else
+	        if abs(b)>abs(a)
+	            τ=-a/b
+	            s=-1/sqrt(1+τ^2)
+	            c=s*τ
+	        else
+	            τ=-b/a
+	            c=1/sqrt(1+τ^2)
+	            s=c*τ
+	        end
+	    end
+	    return c,s
+	end
 end
 
-# ╔═╡ f2647a91-cb20-4740-97ef-dcb6efc38e88
-function RealSchur(A, iteraciones = 10000)
-    H0 = A
-    H1 = HessenbergForm(A)[1]
-    δ = 10
-    for k = 1:iteraciones
-        H0 = H1
-        H1 = HessenbergQR(H1)
-    end
-    return H1
-    
+# ╔═╡ ac0ce702-5986-47a2-982a-151a1d8049f1
+function HessenbergQR(H)
+	n = size(H)[1]
+	H2 = copy(H)
+	C, S = zeros(n-1), zeros(n-1)
+	
+	# Factorización QR de H
+	# Q^T*H o Givens por la izquierda
+	for k = 1:n-1
+		C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
+		H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
+		H2[k+1,k] = 0
+	end
+	
+	# Matriz RQ
+	# H*Q o Givens por la derecha
+	for k = 1:n-1
+		H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
+	end
+	
+	return H2 #RQ Hessenberg superior
 end
 
-# ╔═╡ e16a2c37-32fa-4476-a6c2-69889d532e16
-Diagonal(RealSchur(C))
+# ╔═╡ 275b46e5-30a4-4378-b58b-9c9685d81e92
+HessenbergQR(H)
 
 # ╔═╡ 17ff8c7b-b0aa-4490-8d53-20eb82e9764d
 md"### Paso 3: Apply QR with column pivoting to $AV$ to obtain $U^T (AV)N =R$ "
@@ -384,11 +380,46 @@ md"### Paso 3: Apply QR with column pivoting to $AV$ to obtain $U^T (AV)N =R$ "
 # ╔═╡ ce61ed2c-354e-461b-b654-aaf02202fc7e
 md"### Final"
 
+# ╔═╡ 79b9956c-b3b5-4747-b919-dd4b9fc604bb
+md"
+**To Do:**
+
+utilizar ortogonalización e iteración QR propio (en classroom - matrices simétricas)
+dos formas: con A_TA y la otra, por bloques 2x2 con primer bloque siendo [0 A // A^T 0]
+en ambas calcular los valores propios de la matriz
+- Reemplazar `eigenvalues` por qr propio
+- Reemplazar `Q, _ = qr(AV)` por qr propio
+
+Opción 1: modificar Schur para que devuelva los vectores
+Opción 2: armar V de la otra forma
+"
+
+# ╔═╡ 491e85bc-2104-4908-8797-194c89cf1f7f
+md"
+### Versión nueva
+Queremos un Real Schur que devuelva también Q, la única diferencia con el original es que HessenberQR también debe devolver Q.
+"
+
+# ╔═╡ 04180e6b-b665-4c3b-8200-f5affa39a7e8
+function RealSchur_(A, iteraciones = 10000)
+	H, Q = HessenbergForm(A)
+	for _ = 1:iteraciones
+		H, Q = HessenbergQR_(H, Q)
+	end
+	return H, Q
+end
+
+# ╔═╡ 042dcfd5-d944-417d-a18a-ed982874c185
+Diagonal(RealSchur_(C)[1])
+
+# ╔═╡ 21095a5d-1f28-4c4c-a134-e2a83e20573d
+RealSchur_(C)[2]
+
 # ╔═╡ 596ea23f-236c-4abf-8c06-1e3682bc94dd
 function naiveSVD_classic(A::Matrix{Float64})
     C = transpose(A) * A  # Paso 1: matriz simétrica
 
-    T, V = Schur(C)  # Paso 2: tu algoritmo Schur (QR iterado con Gram-Schmidt)
+    T, V = RealSchur_(C)  # Paso 2: tu algoritmo Schur (QR iterado con Gram-Schmidt)
 
     λ = diag(T)
     σ = sqrt.(abs.(λ))  # valores singulares
@@ -410,165 +441,114 @@ function naiveSVD_classic(A::Matrix{Float64})
         end
     end
 
-    return U, σ, V
+    return SVDReconstruction(U, σ, V)
 end
 
 
-# ╔═╡ 79b9956c-b3b5-4747-b919-dd4b9fc604bb
-md"
-**To Do:**
+# ╔═╡ e8dcce43-1070-46d8-b74b-cd546cbd593a
+s4=naiveSVD_classic(A)
 
-utilizar ortogonalización e iteración QR propio (en classroom - matrices simétricas)
-dos formas: con A_TA y la otra, por bloques 2x2 con primer bloque siendo [0 A // A^T 0]
-en ambas calcular los valores propios de la matriz
-- Reemplazar `eigenvalues` por qr propio
-- Reemplazar `Q, _ = qr(AV)` por qr propio
-"
+# ╔═╡ 8d60fa96-0c4b-44a9-b6cb-d19e1165d948
+validate_svd(A, s4)
 
-# ╔═╡ 491e85bc-2104-4908-8797-194c89cf1f7f
-md"### Versión nueva"
+# ╔═╡ a66ef3b2-602e-4bf6-801f-b44e6af58404
+function HessenbergQR__(H,Q)
+	n = size(H)[1]
+	H2 = copy(H)
+	C, S = zeros(n-1), zeros(n-1)
+	
+	# Factorización QR de H
+	# Q^T*H o Givens por la izquierda
+	for k = 1:n-1
+		C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
+		H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
+		H2[k+1,k] = 0
+		Q[:, k:k+1] = Q[:, k:k+1] * [C[k] S[k]; -S[k] C[k]]  # actualizar Q
+	end
+	
+	# Matriz RQ
+	# H*Q o Givens por la derecha
+	for k = 1:n-1
+		H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
+	end
+	
+	return H2,Q
+end
 
-# ╔═╡ b0355544-b0a6-4f00-9381-cdddcc982b91
-begin
-	function Housev_(x)
-	    n = length(x)
-	    v = ones(size(x))
-	    v[2:n] = x[2:n]
-	    σ = norm(x[2:n])^2
-	    if σ == 0
-	        β = 0
-	    else 
-	        μ = √(x[1]^2+σ)
-	        if x[1] ≤ 0
-	            v[1] = x[1] - μ
-	        else
-	            v[1] = -σ/(x[1]+μ)
-	        end
-	        β = 2*v[1]^2/(σ+v[1]^2)
-	        v = v/(v[1])
-	    end
-	    return v, β
-	end
-	
-	function HessenbergForm_(A)
-	    n = size(A, 1)
-	    H = copy(A)
-	    Q = Matrix(1.0I, n, n)
-	    for k = 1:n-2
-	        v, β = Housev(H[k+1:n, k])
-	        H[k+1:n, k:n] .= (I - β*v*v') * H[k+1:n, k:n]
-	        H[1:n, k+1:n] .= H[1:n, k+1:n] * (I - β*v*v')
-	        Q[:, k+1:n] .= Q[:, k+1:n] * (I - β*v*v')
-	    end
-	    return H, Q
-	end
-	
-	function Givens_(a, b)
-	    if b == 0
-	        return 1.0, 0.0
-	    else
-	        if abs(b) > abs(a)
-	            τ = -a / b
-	            s = 1 / sqrt(1 + τ^2)
-	            c = s * τ
-	        else
-	            τ = -b / a
-	            c = 1 / sqrt(1 + τ^2)
-	            s = c * τ
-	        end
-	        return c, s
-	    end
-	end
-	
-	function HessenbergQR_(H, Q)
-	    n = size(H, 1)
-	    for k = 1:n-1
-	        c, s = Givens_(H[k, k], H[k+1, k])
-	        G = [c -s; s c]
-	        H[k:k+1, k:n] = G * H[k:k+1, k:n]
-	        H[1:n, k:k+1] = H[1:n, k:k+1] * G'
-	        Q[:, k:k+1] = Q[:, k:k+1] * G'
-	    end
-	    return H, Q
-	end
-	
-	function RealSchur_(A, iteraciones = 10000)
-	    H, Q = HessenbergForm_(A)
-	    for _ = 1:iteraciones
-	        H, Q = HessenbergQR_(H, Q)
-	    end
-	    return H, Q
-	end
-	
-	function naiveSVD_classic_(A::Matrix{Float64})
-	    C = transpose(A) * A
-	    T, V = RealSchur_(C)
-	    λ = diag(T)
-	    σ = sqrt.(abs.(λ))
-	    orden = sortperm(σ, rev=true)
-	    σ = σ[orden]
-	    V = V[:, orden]
-	    AV = A * V
-	    U, _, _ = QRPivotado_(AV)
-	    return SVDReconstruction(U, σ, V)
+# ╔═╡ 81719b8d-37c7-4f12-a698-6f64f073b11f
+HessenbergQR__(H, Q)
+
+# ╔═╡ f2647a91-cb20-4740-97ef-dcb6efc38e88
+function RealSchur(A, iteraciones = 10000)
+    H0 = A
+    H1, Q = HessenbergForm(A)
+    δ = 10
+    for _ = 1:iteraciones
+        H0 = H1
+        H1,Q = HessenbergQR__(H1,Q)
+    end
+    return H1, Q
+    
+end
+
+# ╔═╡ e16a2c37-32fa-4476-a6c2-69889d532e16
+Diagonal(RealSchur(C)[1])
+
+# ╔═╡ 240d8bff-c900-4126-b906-3d7d7b9d0e56
+RealSchur(C)[2]
+
+# ╔═╡ f2a6c197-13a8-468e-bb43-61f6010bdae3
+md"#### Ahora...."
+
+# ╔═╡ de232181-3366-4949-a7a4-6dabbcc10cc2
+function QRPivotado_(A::Matrix{Float64})
+	m, n = size(A)
+	Q = zeros(m, n)
+	R = zeros(n, n)
+	P = collect(1:n)
+	A_work = copy(A)
+	norms = [norm(A[:, j]) for j in 1:n]
+
+	for i in 1:n
+		max_col = argmax(norms[i:end]) + i - 1
+		A_work[:, [i, max_col]] = A_work[:, [max_col, i]]
+		P[[i, max_col]] = P[[max_col, i]]
+		norms[[i, max_col]] = norms[[max_col, i]]
+
+		v = A_work[:, i]
+		for j = 1:i-1
+			R[j, i] = dot(Q[:, j], v)
+			v -= R[j, i] * Q[:, j]
+		end
+		R[i, i] = norm(v)
+		Q[:, i] = v / R[i, i]
 	end
 
-	function QRPivotado_(A::Matrix{Float64})
-	    m, n = size(A)
-	    Q = zeros(m, n)
-	    R = zeros(n, n)
-	    P = collect(1:n)
-	    A_work = copy(A)
-	    norms = [norm(A[:, j]) for j in 1:n]
-	
-	    for i in 1:n
-	        max_col = argmax(norms[i:end]) + i - 1
-	        A_work[:, [i, max_col]] = A_work[:, [max_col, i]]
-	        P[[i, max_col]] = P[[max_col, i]]
-	        norms[[i, max_col]] = norms[[max_col, i]]
-	
-	        v = A_work[:, i]
-	        for j = 1:i-1
-	            R[j, i] = dot(Q[:, j], v)
-	            v -= R[j, i] * Q[:, j]
-	        end
-	        R[i, i] = norm(v)
-	        Q[:, i] = v / R[i, i]
-	    end
-	
-	    return Q, R, P
-	end	
+	return Q, R, P
+end	
+
+# ╔═╡ ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
+function naiveSVD_classic_(A::Matrix{Float64})
+	C = transpose(A) * A
+	T, V = RealSchur_(C)
+	λ = diag(T)
+	σ = sqrt.(abs.(λ))
+	orden = sortperm(σ, rev=true)
+	σ = σ[orden]
+	V = V[:, orden]
+	AV = A * V
+	U, _, _ = QRPivotado_(AV)
+	return SVDReconstruction(U, σ, V)
 end
 
 # ╔═╡ 6f6f3e46-7164-4200-88fb-3a437543986f
 s3=naiveSVD_classic_(A)
 
 # ╔═╡ c80c0ecf-1b44-445f-a990-d044e4d4280c
-validate_svd(A, s3)
+validate_svd(A, s3) #sirve más o menos
 
 # ╔═╡ 5e2753e3-bb12-442c-992e-0ac11a147f57
 validate_svd(A, s3; V_transposed=true)
-
-# ╔═╡ 82d13c2a-f64d-447a-9b4b-371f2d3d50c2
-begin
-	D=rand(500,500)
-	s4=naiveSVD_classic_(D)
-end
-
-# ╔═╡ 042dcfd5-d944-417d-a18a-ed982874c185
-Diagonal(RealSchur_(C)[1])
-
-# ╔═╡ 21095a5d-1f28-4c4c-a134-e2a83e20573d
-RealSchur_(C)[2]
-
-# ╔═╡ 9779b71a-60cf-4a6d-8337-7d4421a9d8fe
-eigen(C)
-
-# ╔═╡ 3c82519a-9c07-49b8-a0b8-ba7d895077af
-A2 = naiveSVD_classic_(C)
-
-# ╔═╡ ea15f2f1-82c2-4060-9855-09eb495a56c6
-validate_svd(C, A2)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -630,18 +610,22 @@ version = "5.11.0+0"
 # ╠═33b3d729-7315-4c60-9854-48d9a246cd32
 # ╠═df587928-e939-4d20-a959-eb4128980bed
 # ╠═6f6f3e46-7164-4200-88fb-3a437543986f
+# ╠═e8dcce43-1070-46d8-b74b-cd546cbd593a
 # ╟─b3b5bc5b-c93d-4f92-9d89-33165587bf1e
 # ╠═578c849f-0760-41a6-b6f2-0a225afddeb8
-# ╠═8c02d86c-9479-4df8-a94f-8489406a5356
 # ╟─318ce551-45b6-4d04-ba66-4d622051807d
 # ╠═210b22b9-13e6-4d29-a1f4-6d0e85bf45a6
-# ╠═83cb9d8a-b759-473e-9d2e-52b6fb5f2054
 # ╠═fa7fafbc-04d3-4c69-9aad-4ee86fcffba6
 # ╠═c80c0ecf-1b44-445f-a990-d044e4d4280c
+# ╠═8d60fa96-0c4b-44a9-b6cb-d19e1165d948
+# ╟─a0236861-049d-40c3-9069-70029c13bc69
+# ╠═8c02d86c-9479-4df8-a94f-8489406a5356
+# ╠═83cb9d8a-b759-473e-9d2e-52b6fb5f2054
 # ╠═5e2753e3-bb12-442c-992e-0ac11a147f57
 # ╟─b460bc19-8641-47ba-89e6-06faf66f53ac
 # ╠═82d13c2a-f64d-447a-9b4b-371f2d3d50c2
 # ╟─41c1603c-6101-4bee-b66a-3f88dacce14d
+# ╠═a4858212-5dd0-406a-ac48-314dbb539517
 # ╠═7618b8dc-1f91-40a3-9ea3-a8248b9efe28
 # ╟─7066f320-5339-40db-bdda-1e1c396e6fc1
 # ╠═293b240e-fd3b-48e4-ba3c-d5e337fd4d2f
@@ -650,27 +634,32 @@ version = "5.11.0+0"
 # ╟─921e6808-b9e7-493f-8042-6f8e5419a117
 # ╟─aae50fe4-6d55-4e6e-803c-1dde61f1947f
 # ╟─9e7998ae-f91b-424b-bca8-05fcd71064ec
-# ╠═042dcfd5-d944-417d-a18a-ed982874c185
-# ╠═e16a2c37-32fa-4476-a6c2-69889d532e16
 # ╠═ce85b232-ec3d-4d1c-84d5-420f9911ac24
+# ╠═e16a2c37-32fa-4476-a6c2-69889d532e16
+# ╠═042dcfd5-d944-417d-a18a-ed982874c185
 # ╟─e8606e61-cbaf-4062-8c4f-abb653737919
-# ╠═21095a5d-1f28-4c4c-a134-e2a83e20573d
 # ╠═b88b2e64-6c79-461c-a89e-ee816bd4a2ba
+# ╠═240d8bff-c900-4126-b906-3d7d7b9d0e56
+# ╠═21095a5d-1f28-4c4c-a134-e2a83e20573d
+# ╟─1e0bd262-f985-44c9-8e4f-136fc43b6390
+# ╠═af05a8ab-8a80-49c3-b5c9-78a80d257490
+# ╠═275b46e5-30a4-4378-b58b-9c9685d81e92
+# ╠═81719b8d-37c7-4f12-a698-6f64f073b11f
+# ╠═6a3a3959-b7aa-4a07-82ba-7be858463acc
+# ╠═ac0ce702-5986-47a2-982a-151a1d8049f1
 # ╟─e2df08c4-245e-48d8-b680-539d9b12adda
-# ╠═469bb3f0-bdc9-46a5-b3ab-73149ddf9bbd
 # ╠═f2647a91-cb20-4740-97ef-dcb6efc38e88
 # ╠═b32ef216-4e64-44aa-9e84-1bedbccabac3
-# ╠═9745ad15-080c-493e-9c5e-3a88aebf1068
-# ╠═5a22a26a-1e35-4200-b5b1-4462e4878b74
 # ╠═9affa8ea-51cd-4a7b-95e4-e79eedd291fa
-# ╠═17ff8c7b-b0aa-4490-8d53-20eb82e9764d
+# ╟─17ff8c7b-b0aa-4490-8d53-20eb82e9764d
 # ╟─ce61ed2c-354e-461b-b654-aaf02202fc7e
 # ╠═596ea23f-236c-4abf-8c06-1e3682bc94dd
 # ╟─79b9956c-b3b5-4747-b919-dd4b9fc604bb
 # ╟─491e85bc-2104-4908-8797-194c89cf1f7f
-# ╠═b0355544-b0a6-4f00-9381-cdddcc982b91
-# ╠═9779b71a-60cf-4a6d-8337-7d4421a9d8fe
-# ╠═3c82519a-9c07-49b8-a0b8-ba7d895077af
-# ╠═ea15f2f1-82c2-4060-9855-09eb495a56c6
+# ╠═04180e6b-b665-4c3b-8200-f5affa39a7e8
+# ╠═a66ef3b2-602e-4bf6-801f-b44e6af58404
+# ╟─f2a6c197-13a8-468e-bb43-61f6010bdae3
+# ╠═de232181-3366-4949-a7a4-6dabbcc10cc2
+# ╠═ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
