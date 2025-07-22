@@ -236,6 +236,14 @@ function initialize_missing(A_obs, M; method="row")
 end
 
 
+# ╔═╡ 08e7c405-b941-4011-be07-a4519a430383
+# Explicar por qué sirve para inpainting
+# De dónde salió el alg?
+# utilizar SVD propio
+# Límite miércoles
+
+# Toma 1 minuto cada svd ;/ porque es una imagen de 500x500
+
 # ╔═╡ 8558ba84-507e-4034-99fe-432afdc12087
 md"
 ### Aplicar algoritmo de in-painting por SVD
@@ -251,6 +259,8 @@ Para esto busca la matriz más sencilla (suavizada) que:
 * El SVD captura la estructura global del algoritmo,
 * el truncado de rango impone regularidad y elimina el ruido,
 * las iteraciones sucesivas fuerzan que la solución sea consistente con datos conocidos
+
+#### Con funciones de Julia
 "
 
 # ╔═╡ dc78e695-4852-424e-ae63-34762cded85b
@@ -289,9 +299,183 @@ function svd_inpainting(A_obs::Matrix{Float64}, M::Matrix{Float64}, k::Int=50, m
 end
 
 
-# ╔═╡ 1f0f90c2-f71b-4fde-b223-22d101ff44c9
+# ╔═╡ bf1d46b6-2d5f-451c-83ac-cdbe062f245c
+md"#### Con funciones propias"
+
+# ╔═╡ 0d16a700-58ee-450f-b1ff-ddc4b7e147b3
+md"##### Implementación SVD"
+
+# ╔═╡ 61e867fa-a908-4cc7-beeb-90d276b9c897
+struct SVDReconstruction
+    U::Matrix{Float64}
+    S::Vector{Float64}
+    V::Matrix{Float64}
+end
+
+
+# ╔═╡ 5e862bcc-a235-4c5e-81a7-fc73bd04a06a
+begin
+	function Housev(x)
+	    n = length(x)
+	    v = ones(size(x))
+	    v[2:n] = x[2:n]
+	    σ = norm(x[2:n])^2
+	    if σ == 0
+	        β = 0
+	    else 
+	        μ = √(x[1]^2+σ)
+	        if x[1] ≤ 0
+	            v[1] = x[1] - μ
+	        else
+	            v[1] = -σ/(x[1]+μ)
+	        end
+	        β = 2*v[1]^2/(σ+v[1]^2)
+	        v = v/(v[1])
+	    end
+	    return v, β
+	end
+	
+	function HessenbergForm_(A)
+	    n = size(A, 1)
+	    H = copy(A)
+	    Q = Matrix(1.0I, n, n)
+	    for k = 1:n-2
+	        v, β = Housev(H[k+1:n, k])
+	        H[k+1:n, k:n] .= (I - β*v*v') * H[k+1:n, k:n]
+	        H[1:n, k+1:n] .= H[1:n, k+1:n] * (I - β*v*v')
+	        Q[:, k+1:n] .= Q[:, k+1:n] * (I - β*v*v')
+	    end
+	    return H, Q
+	end
+	
+	function Givens_(a, b)
+	    if b == 0
+	        return 1.0, 0.0
+	    else
+	        if abs(b) > abs(a)
+	            τ = -a / b
+	            s = 1 / sqrt(1 + τ^2)
+	            c = s * τ
+	        else
+	            τ = -b / a
+	            c = 1 / sqrt(1 + τ^2)
+	            s = c * τ
+	        end
+	        return c, s
+	    end
+	end
+	
+	function HessenbergQR_(H, Q)
+	    n = size(H, 1)
+	    for k = 1:n-1
+	        c, s = Givens_(H[k, k], H[k+1, k])
+	        G = [c -s; s c]
+	        H[k:k+1, k:n] = G * H[k:k+1, k:n]
+	        H[1:n, k:k+1] = H[1:n, k:k+1] * G'
+	        Q[:, k:k+1] = Q[:, k:k+1] * G'
+	    end
+	    return H, Q
+	end
+	
+	function RealSchur_(A, iteraciones = 10000)
+	    H, Q = HessenbergForm_(A)
+	    for _ = 1:iteraciones
+	        H, Q = HessenbergQR_(H, Q)
+	    end
+	    return H, Q
+	end
+
+	function QRPivotado_(A::Matrix{Float64})
+	    m, n = size(A)
+	    Q = zeros(m, n)
+	    R = zeros(n, n)
+	    P = collect(1:n)
+	    A_work = copy(A)
+	    norms = [norm(A[:, j]) for j in 1:n]
+	
+	    for i in 1:n
+	        max_col = argmax(norms[i:end]) + i - 1
+	        A_work[:, [i, max_col]] = A_work[:, [max_col, i]]
+	        P[[i, max_col]] = P[[max_col, i]]
+	        norms[[i, max_col]] = norms[[max_col, i]]
+	
+	        v = A_work[:, i]
+	        for j = 1:i-1
+	            R[j, i] = dot(Q[:, j], v)
+	            v -= R[j, i] * Q[:, j]
+	        end
+	        R[i, i] = norm(v)
+	        Q[:, i] = v / R[i, i]
+	    end
+	
+	    return Q, R, P
+	end
+	
+	function naiveSVD_classic_(A::Matrix{Float64})
+	    C = transpose(A) * A
+	    T, V = RealSchur_(C)
+	    λ = diag(T)
+	    σ = sqrt.(abs.(λ))
+	    orden = sortperm(σ, rev=true)
+	    σ = σ[orden]
+	    V = V[:, orden]
+	    AV = A * V
+	    U, _, _ = QRPivotado_(AV)
+	    return SVDReconstruction(U, σ, V)
+	end	
+end
+
+# ╔═╡ 219e47ad-96ad-4be7-965b-30c209c5903f
+md"##### SVD inpainting"
+
+# ╔═╡ 3c11aae2-81c9-47bf-aca2-78567afc4972
+function svd_inpainting_manual(A_obs::Matrix{Float64}, M::Matrix{Float64}, k::Int=50, max_iter::Int=30)
+    # Inicializamos la matriz de reconstrucción con los datos observados
+    A_rec = copy(A_obs)
+
+    for iter in 1:max_iter
+        # Descomposición SVD de la imagen actual
+        svd = naiveSVD_classic_(A_rec)
+
+        # Truncamos los valores singulares a rango k
+        S_trunc = Diagonal(vcat(svd.S[1:k], zeros(length(svd.S) - k)))
+
+        # Reconstruimos la versión de rango bajo
+        A_lowrank = svd.U * S_trunc * svd.V'
+
+        # Actualizamos: mantenemos los píxeles conocidos y sustituimos los faltantes
+        A_rec = M .* A_obs + (1 .- M) .* A_lowrank
+    end
+
+    return A_rec
+end
+
+
+# ╔═╡ 20b98000-d061-4f7b-a9aa-da4fb421cf59
 md"
 ## Ejemplos
+### Con funciones propias
+"
+
+# ╔═╡ b62bad5f-174d-4a44-8dda-776333954109
+md"Primero, ejecutemos las funciones y veamos que cada iteración toma apróximadamente un minuto (lo cual es un número gigante).
+Por esto, vamos a limitarnos a 3 iteraciones por el momento."
+
+# ╔═╡ c51040ec-b5ed-4ba7-aff2-60713c292606
+md"Ahora, a modo de control, veamos el algoritmo utilizando el svd de julia. A izquierda con 10 iteraciones y a derecha con solo 3."
+
+# ╔═╡ 2cf3d5df-7ee5-45e2-bb13-65be38fa9d34
+md"Seguido a esto, ejecutemos el código propio y comparemos en diferentes casos:
+* a izquierda, 3 iteraciones sobre la imagen sin inicializar,
+* en el medio, 3 iteraciones sobre la imagen ya inicializada
+* y a la derecha, la imagen inicializada sin pasarla por un algoritmo de inpainting.
+
+Podemos ver que en la primera, los grandes huecos blancos no se alcanzan a terminar bien. Es por esto que la segunda imagen que trabaja sobre una ya inicializada, funciona mejor, pero al compararla con la imagen de inicialización podemos ver que también es gracias a nuestro algoritmo de inpainting.
+"
+
+# ╔═╡ 1f0f90c2-f71b-4fde-b223-22d101ff44c9
+md"
+### Con algoritmos propios
 A continuación veremos dos ejemplos de imágenes, la primera ha sido dañada artificialmente y la segunda ha tenido daño real.
 
 En las gráficas podremos ver, en orden:
@@ -327,6 +511,33 @@ begin
 	ncol=3
 )
 end
+
+# ╔═╡ ea1238d1-608d-41d3-a8b2-f808d105f909
+naiveSVD_classic_(matrix_ex2)
+
+# ╔═╡ 6cfccb92-ccb7-49de-92bc-e1ae971b68db
+matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2, 10, 3)
+
+# ╔═╡ 04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
+begin
+	init_ex5 = initialize_missing(matrix_ex2, mask_ex2; method="global");
+	matrix6 = svd_inpainting_manual(init_ex5, mask_ex2, 10, 3)
+end
+
+# ╔═╡ 08838687-83a8-4a94-8420-973b17645834
+	mosaicview(
+	Gray.(matrix5),
+	Gray.(matrix6),
+	Gray.(init_ex5); 
+	ncol=3
+)
+
+# ╔═╡ ca125213-f2b3-4be1-8217-745c206b907d
+mosaicview(
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2, 10, 10)), 
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2, 10, 3)); 
+	ncol=2
+)
 
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
@@ -2434,9 +2645,25 @@ version = "1.9.2+0"
 # ╟─dfa2de65-b023-4c75-99bd-e714861ad46f
 # ╟─aa48a83d-6310-4713-9f9c-43644265bafd
 # ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
+# ╠═08e7c405-b941-4011-be07-a4519a430383
 # ╟─8558ba84-507e-4034-99fe-432afdc12087
 # ╠═dc78e695-4852-424e-ae63-34762cded85b
-# ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
+# ╟─bf1d46b6-2d5f-451c-83ac-cdbe062f245c
+# ╟─0d16a700-58ee-450f-b1ff-ddc4b7e147b3
+# ╠═5e862bcc-a235-4c5e-81a7-fc73bd04a06a
+# ╠═61e867fa-a908-4cc7-beeb-90d276b9c897
+# ╠═ea1238d1-608d-41d3-a8b2-f808d105f909
+# ╟─219e47ad-96ad-4be7-965b-30c209c5903f
+# ╠═3c11aae2-81c9-47bf-aca2-78567afc4972
+# ╠═20b98000-d061-4f7b-a9aa-da4fb421cf59
+# ╠═b62bad5f-174d-4a44-8dda-776333954109
+# ╠═6cfccb92-ccb7-49de-92bc-e1ae971b68db
+# ╠═04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
+# ╟─c51040ec-b5ed-4ba7-aff2-60713c292606
+# ╠═ca125213-f2b3-4be1-8217-745c206b907d
+# ╟─2cf3d5df-7ee5-45e2-bb13-65be38fa9d34
+# ╠═08838687-83a8-4a94-8420-973b17645834
+# ╠═1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
 # ╠═72177df0-5329-4f71-88ce-25f6427aa8b8
