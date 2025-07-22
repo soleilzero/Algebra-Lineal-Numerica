@@ -41,6 +41,32 @@ No solo existe para cualquier matriz y proporciona información estructural sobr
 
 "
 
+# ╔═╡ b250760b-efa2-46df-a1e4-656547a6d3d9
+md"""
+## Reflexión y aprendizajes
+
+El principal aprendizaje que me dejó este notebook fue la importancia de la comunicación, dado que inicialmente no tenía claras las instrucciones y estaba haciendo un trabajo innecesario.
+
+## Declaración sobre el uso de inteligencia artificial y fuentes externas
+
+Durante la realización de este trabajo se utilizó **asistencia de inteligencia artificial (IA)** para generar y mejorar partes del código y de los textos explicativos, con el fin de estructurar mejor el contenido y optimizar la implementación.
+
+### Uso de IA:
+
+Se utilizó **ChatGPT (OpenAI)** de forma activa para la generación y refactorización de código en Julia.
+
+**Algunos prompts utilizados:**
+
+* "¿A qué se debe este error: `MethodError: no method matching iterate(::Main.var"workspace#25".SVDReconstruction)`? "
+
+---
+
+### Fuentes externas consultadas:
+
+* Golub, G., & Van Loan, C. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.
+
+"""
+
 # ╔═╡ 69ad41a3-b775-4168-a3c7-218d45eaa0d5
 md"## Teoría"
 
@@ -590,6 +616,7 @@ version = "5.11.0+0"
 # ╔═╡ Cell order:
 # ╟─9c09483c-6619-11f0-339c-3132d4ffd563
 # ╟─71039e0e-48ff-4953-b400-ce22494ff56a
+# ╟─b250760b-efa2-46df-a1e4-656547a6d3d9
 # ╠═69ad41a3-b775-4168-a3c7-218d45eaa0d5
 # ╟─8c4925b3-70c8-4d63-9140-1ba1a541f14d
 # ╟─36cc1bce-5264-4f14-8e79-ab83320e083d
