@@ -107,7 +107,7 @@ El inpainting de imágenes consiste en reconstruir las partes faltantes o dañad
 
 Este proceso se basa en la idea de que muchas imágenes (o matrices de datos) contienen información redundante y, por tanto, pueden representarse bien con una aproximación de bajo rango. Esto significa que los valores conocidos contienen suficiente estructura para predecir los valores faltantes.
 
-El problema se convierte entonces en un completado de matrices de rango bajo.
+El problema se convierte entonces en un completado de matrices de rango bajo. En este caso vamos a utilizar el algoritmo Soft-Impute de Mazumder, Hastie y Tibshirani (2010). 
 
 **🔧 Máscara de observación**
 
@@ -128,42 +128,50 @@ Se realiza un proceso iterativo donde se alterna entre:
 #### 📝 Algoritmo paso a paso
 
 Recibe una imagen $A$, una máscara $M$, un rango máximo $k$ y un máximo de iteraciones $max\_iter$.
+*Soft-Impute*
 
-1. **Inicialización**:
-   Comenzar con una copia $A_{\text{rec}}$ de la imagen $A$. Los valores faltantes pueden inicializarse arbitrariamente (por ejemplo, en cero).
+Se trata de un procedimiento iterativo para completar matrices con faltantes, minimizando:
 
-2. **Repetir hasta alcanzar el número máximo de iteraciones**:
+$\frac{1}{2}\|P_\Omega(X) - P_\Omega(Z)\|_F^2 + \lambda \|Z\|_*$
 
-   a. **Descomposición SVD**:
-   Obtener la descomposición en valores singulares de la matriz actual $A_{\text{rec}}$:
+donde $P_\Omega$ proyecta sólo las entradas observadas, $\|\cdot\|_*$ es la norma nuclear y λ controla cuánto penalizamos rangos altos (más λλ ⇒ más bajo rango).
 
-   $A_{\text{rec}} = U \Sigma V^T$
+#### 1. Inicialización
 
-   b. **Truncado de valores singulares**:
-   Conservar solo los $k$ valores singulares más grandes en $\Sigma$. El resto se remplaza por ceros.
+* Z ← 0: Inicializamos la matriz estimada como una matriz de ceros.
 
-   c. **Reconstrucción de rango bajo**:
-   Construir la matriz aproximada de rango $k$:
+* X_filled: matriz auxiliar que será la combinación de valores observados y estimados.
 
-   $A_{\text{lowrank}} = U_k \Sigma_k V_k^T$
+* Se fija un valor de penalización λ (más grande ⇒ más truncamiento en el SVD).
 
-   d. **Actualización de los valores faltantes**:
-   Actualizar los valores de $A_{\text{rec}}$:
+#### 2. Rellenado de valores faltantes
 
-   * Los **píxeles conocidos** se mantienen igual (se respetan los datos originales).
-   * Los **píxeles faltantes** se completan con los valores de $A_{\text{lowrank}}$.
+Mantenemos los valores verdaderos en las posiciones observadas $X[i,j]$. En las posiciones faltantes, usamos los valores de la estimación anterior $Z[i,j]$.
+Al inicio, como Z es cero, rellenamos con ceros, pero luego esto se refina iterativamente.
 
-3. **Resultado final**:
-   La matriz $A_{\text{rec}}$ contiene la imagen reconstruida tras las iteraciones.
+#### 3. Descomposición SVD
+Calculamos la descomposición en valores singulares:
+$X\_filled=UΣV^T$
 
-#### ¿Por qué funciona?
-* Suposición de rango bajo: muchas imágenes y datos reales pueden aproximarse con matrices de bajo rango.
+#### 4. Soft-thresholding
+A cada valor singular $σ_i$, le restamos $λ$, y lo ponemos a cero si queda negativo.
+Esto se llama soft-thresholding y es lo que implementa la penalización nuclear.
 
-* Truncación de valores singulares impone la estructura deseada.
+A partir de esto reconstruimos la matriz estimada `Z_new` utilizando solo los valores singularesmás importantes.
+
+#### 5. Verificación de convergencia
+
+Medimos cuánto ha cambiado la matriz estimada en esta iteración (en norma Frobenius).
+Si el cambio relativo es suficientemente pequeño (< tol), paramos.
+
+### ¿Por qué funciona?
+* Suposición de rango bajo: muchas imágenes y datos reales pueden aproximarse con matrices de bajo rango, lo que nos permite reemplazar elementos faltantes con la matriz de bajo rango. 
+
+* Repite hasta convergencia.
+
+* Escoge los valores singulares relevantes mediante soft-thresholding.
 
 * Proyección por máscara garantiza fidelidad con los datos observados.
-
-* La combinación iterativa converge a una aproximación razonable cuando los datos observados son suficientes y no están sesgados.
 "
 
 # ╔═╡ 8c798beb-8a08-426a-bd07-dd124b2add09
@@ -255,21 +263,16 @@ Es un algoritmo iterativo que rellena los valores faltantes de una matriz (por e
 Para esto busca la matriz más sencilla (suavizada) que:
 * Respete los valores conocidos.
 * Tenga rango bajo.
-
-**¿Por qué funciona?**
-* El SVD captura la estructura global del algoritmo,
-* el truncado de rango impone regularidad y elimina el ruido,
-* las iteraciones sucesivas fuerzan que la solución sea consistente con datos conocidos
-
 "
 
-# ╔═╡ b3172550-1162-42cd-a646-f8648b35e262
-md"
-#### Soft_impute con funciones de Julia
-"
+# ╔═╡ 5df8a1a5-ad79-4efa-b8da-af9967da6631
+md"#### Con funciones de Julia"
 
 # ╔═╡ 29532b55-58b2-46ac-86c6-eda0bbf6c813
-function soft_impute(X::AbstractMatrix, mask::AbstractMatrix;
+"""
+Realiza el completado de matrices dañadas con el algoritmo SoftImpute.
+"""
+function svd_inpainting(X::AbstractMatrix, mask::AbstractMatrix;
                      λ::Float64 = 1.0,
                      max_rank::Int = typemax(Int),
                      max_iter::Int = 100,
@@ -311,45 +314,6 @@ function soft_impute(X::AbstractMatrix, mask::AbstractMatrix;
 		X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
 	end
     return X_filled
-end
-
-
-# ╔═╡ 5df8a1a5-ad79-4efa-b8da-af9967da6631
-md"#### Con funciones de Julia"
-
-# ╔═╡ dc78e695-4852-424e-ae63-34762cded85b
-"""
-Completa una imagen incompleta utilizando un método iterativo basado en SVD. Busca la mejor aproximación de rango bajo que coincida con los valores conocidos
-
-Argumentos:
-- `A_obs::Array{Float64}`: Matriz de la imagen observada (con valores faltantes).
-- `M::Array{Float64}`: Máscara binaria de observación. 
-    - `M[i,j] = 1` si el píxel (i,j) es conocido.
-    - `M[i,j] = 0` si el píxel (i,j) es faltante.
-- `k::Int=50`: Número de valores singulares conservados (rango deseado).
-- `max_iter::Int=30`: Número máximo de iteraciones.
-
-Retorna la matriz reconstruida de la imagen `A_rec::Array{Float64}`.
-"""
-function svd_inpainting(A_obs::Matrix{Float64}, M::Matrix{Float64}, k::Int=50, max_iter::Int=30)
-    # Inicializamos la matriz de reconstrucción con los datos observados
-    A_rec = copy(A_obs)
-
-    for iter in 1:max_iter
-        # Descomposición SVD de la imagen actual
-        U, S, V = svd(A_rec)
-
-        # Truncamos los valores singulares a rango k
-        S_trunc = Diagonal(vcat(S[1:k], zeros(length(S) - k)))
-
-        # Reconstruimos la versión de rango bajo
-        A_lowrank = U * S_trunc * V'
-
-        # Actualizamos: mantenemos los píxeles conocidos y sustituimos los faltantes
-        A_rec = M .* A_obs + (1 .- M) .* A_lowrank
-    end
-
-    return A_rec
 end
 
 
@@ -622,11 +586,11 @@ mosaicview(
 begin
 	matrix_ex3 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
 	mask_ex3 = generate_mask(matrix_ex3, .6)
-	svd_inpainting(matrix_ex3, mask_ex3, 10, 10)
+	svd_inpainting(matrix_ex3, mask_ex3)
 end
 
 # ╔═╡ c3df9380-c344-4434-ba11-5f46bbc22a3a
-Z_hat = soft_impute(matrix_ex3, mask_ex3; λ=0.5, max_rank=5, max_iter=200)
+Z_hat = svd_inpainting(matrix_ex3, mask_ex3; λ=0.5, max_rank=5, max_iter=200)
 
 # ╔═╡ 91363b9f-26c8-47b8-8ac8-981ff2286ec9
 Gray.(Z_hat)
@@ -2740,14 +2704,12 @@ version = "1.9.2+0"
 # ╟─aa48a83d-6310-4713-9f9c-43644265bafd
 # ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
 # ╠═8558ba84-507e-4034-99fe-432afdc12087
-# ╟─b3172550-1162-42cd-a646-f8648b35e262
+# ╠═5df8a1a5-ad79-4efa-b8da-af9967da6631
 # ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
 # ╠═c3df9380-c344-4434-ba11-5f46bbc22a3a
 # ╠═56d07be9-32ee-4741-aab3-024abf299d5c
 # ╠═6e4f0a3d-31f8-4fe5-a6d2-328f584e5aaf
 # ╠═91363b9f-26c8-47b8-8ac8-981ff2286ec9
-# ╟─5df8a1a5-ad79-4efa-b8da-af9967da6631
-# ╠═dc78e695-4852-424e-ae63-34762cded85b
 # ╟─bf1d46b6-2d5f-451c-83ac-cdbe062f245c
 # ╟─0d16a700-58ee-450f-b1ff-ddc4b7e147b3
 # ╟─b649cd99-5310-4ba5-99fe-bd9c4583c54c
