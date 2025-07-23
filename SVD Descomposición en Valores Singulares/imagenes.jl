@@ -497,14 +497,14 @@ function svd_inpainting_manual(X::AbstractMatrix, mask::AbstractMatrix;
         end
 
         # Step 2: Descomposición SVD
-        U, S, Vt = naiveSVD_classic_(X_filled)
+        svd = naiveSVD_classic_(X_filled)
 
         # Step 3: Umbralización suave (soft-thresholding)
-        S_thresholded = max.(S .- λ, 0.0)
+        S_thresholded = max.(svd.S .- λ, 0.0)
         k = min(count(x -> x > 0.0, S_thresholded), max_rank)
 
         # Step 4: Reconstrucción truncada
-        Z_new = U[:, 1:k] * Diagonal(S_thresholded[1:k]) * Vt[:, 1:k]'
+        Z_new = svd.U[:, 1:k] * Diagonal(S_thresholded[1:k]) * svd.V[:, 1:k]'
 
         # Step 5: Criterio de parada
         diff = norm(Z_new - Z) / max(norm(Z), 1e-8)
@@ -558,34 +558,40 @@ En las gráficas podremos ver, en orden:
 
 # ╔═╡ 96af3132-6566-4cb7-a210-3d019467550d
 begin
-	#matrix_ex1 = Float64.(Gray.(load("imagen_ejemplo.png")))
+	matrix_ex1 = Float64.(Gray.(load("imagen_ejemplo.png")))
 	mask_ex1 = generate_mask(matrix_ex1, .95)
 	init_ex1 = initialize_missing(matrix_ex1, mask_ex1; method="global");
 	
 	mosaicview(
-	Gray.(matrix_ex1), 
-	Gray.(mask_ex1), 
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1, 10, 10)); 
-	ncol=3
-)
+		Gray.(matrix_ex1), 
+		Gray.(mask_ex1), 
+		Gray.(svd_inpainting(matrix_ex1, mask_ex1)); 
+		ncol=3
+	)
 end
 
 # ╔═╡ 5b2ba4a0-448a-4300-a259-da1d02ac1bbd
 begin
-	#matrix_ex2 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
+	matrix_ex2 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
 	mask_ex2 = generate_mask(matrix_ex2, .6)
 	init_ex2 = initialize_missing(matrix_ex2, mask_ex2; method="global");
 	
 	mosaicview(
 	Gray.(matrix_ex2), 
 	Gray.(mask_ex2), 
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2, 10, 10)); 
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2)); 
 	ncol=3
 )
 end
 
+# ╔═╡ c3df9380-c344-4434-ba11-5f46bbc22a3a
+Z_hat = svd_inpainting(matrix_ex2, mask_ex2; λ=0.5, max_rank=5, max_iter=200)
+
 # ╔═╡ 6cfccb92-ccb7-49de-92bc-e1ae971b68db
-matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2, 10, 1)
+matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2; max_iter=1)
+
+# ╔═╡ 7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
+Gray.(svd_inpainting(matrix5, mask_ex2))
 
 # ╔═╡ 04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
 begin
@@ -603,29 +609,11 @@ mosaicview(
 
 # ╔═╡ ca125213-f2b3-4be1-8217-745c206b907d
 mosaicview(
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2, 10, 10)), 
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2, 10, 3)); 
-	ncol=2
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=1)), 
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=10)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2)); 
+	ncol=3
 )
-
-# ╔═╡ 38ad630c-9488-4340-878a-b74c1a77f750
-begin
-	matrix_ex3 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
-	mask_ex3 = generate_mask(matrix_ex3, .6)
-	svd_inpainting(matrix_ex3, mask_ex3)
-end
-
-# ╔═╡ c3df9380-c344-4434-ba11-5f46bbc22a3a
-Z_hat = svd_inpainting(matrix_ex3, mask_ex3; λ=0.5, max_rank=5, max_iter=200)
-
-# ╔═╡ 91363b9f-26c8-47b8-8ac8-981ff2286ec9
-Gray.(Z_hat)
-
-# ╔═╡ 56d07be9-32ee-4741-aab3-024abf299d5c
-mask_ex3
-
-# ╔═╡ 6e4f0a3d-31f8-4fe5-a6d2-328f584e5aaf
-Gray.(matrix_ex3)
 
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
@@ -646,7 +634,7 @@ Retorna un diccionario de reconstrucciones.
 function reconstruct_all(initializations, mask; k=50, max_iter=30)
     recs = Dict()
     for (key, A_init) in initializations
-        recs[key] = svd_inpainting(A_init, mask, k, max_iter)
+        recs[key] = svd_inpainting(A_init, mask)
     end
     return recs
 end
@@ -696,7 +684,7 @@ function compare_initilizations(A, mask; k=50, max_iter=10, ncol=4, verbose=fals
 		println("Orden de las imágenes: ", collect(keys(recs)))
 	end
 	show_reconstructions(recs, ncol=ncol)
-#end
+end
 
 
 # ╔═╡ 702f99ea-3c58-4782-98dd-6dceddbf767c
@@ -728,7 +716,7 @@ Para $k=30$, los huecos tienden al color de base, por lo que la imagen no inicia
 
 # ╔═╡ 6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 md"
-### Diferentes valores de k
+### Diferentes valores de $λ$
 Queremos un mosaico que muestre las imágenes con k=5,10,20,40 por e.g.
 
 Veremos si se cumple que:
@@ -741,19 +729,19 @@ Veremos si se cumple que:
 
 # ╔═╡ fe9f245b-0c84-45ef-94da-bfc29e5c7b32
 mosaicview(
-	Gray.(svd_inpainting(init_ex1, mask_ex1, 5)),
-	Gray.(svd_inpainting(init_ex1, mask_ex1, 10)),
-	Gray.(svd_inpainting(init_ex1, mask_ex1, 30)),
-	Gray.(svd_inpainting(init_ex1, mask_ex1, 75));
+	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=.1)),
+	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=.5)),
+	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=1.0)),
+	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=2.0));
 	ncol = 4
 )
 
 # ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
 mosaicview(
-	Gray.(svd_inpainting(init_ex2, mask_ex2, 5)),
-	Gray.(svd_inpainting(init_ex2, mask_ex2, 10)),
-	Gray.(svd_inpainting(init_ex2, mask_ex2, 30)),
-	Gray.(svd_inpainting(init_ex2, mask_ex2, 75));
+	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=.1)),
+	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=.5)),
+	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=1.0)),
+	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=2.0));
 	ncol = 4
 )
 
@@ -2730,9 +2718,6 @@ version = "1.9.2+0"
 # ╠═5df8a1a5-ad79-4efa-b8da-af9967da6631
 # ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
 # ╠═c3df9380-c344-4434-ba11-5f46bbc22a3a
-# ╠═56d07be9-32ee-4741-aab3-024abf299d5c
-# ╠═6e4f0a3d-31f8-4fe5-a6d2-328f584e5aaf
-# ╠═91363b9f-26c8-47b8-8ac8-981ff2286ec9
 # ╟─bf1d46b6-2d5f-451c-83ac-cdbe062f245c
 # ╟─0d16a700-58ee-450f-b1ff-ddc4b7e147b3
 # ╟─b649cd99-5310-4ba5-99fe-bd9c4583c54c
@@ -2742,9 +2727,10 @@ version = "1.9.2+0"
 # ╟─61e867fa-a908-4cc7-beeb-90d276b9c897
 # ╟─219e47ad-96ad-4be7-965b-30c209c5903f
 # ╠═443289ce-22fc-46d7-a93f-9e6fe097cfc5
-# ╠═20b98000-d061-4f7b-a9aa-da4fb421cf59
-# ╠═b62bad5f-174d-4a44-8dda-776333954109
+# ╟─20b98000-d061-4f7b-a9aa-da4fb421cf59
+# ╟─b62bad5f-174d-4a44-8dda-776333954109
 # ╠═6cfccb92-ccb7-49de-92bc-e1ae971b68db
+# ╠═7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
 # ╠═04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
 # ╟─c51040ec-b5ed-4ba7-aff2-60713c292606
 # ╠═ca125213-f2b3-4be1-8217-745c206b907d
@@ -2753,9 +2739,8 @@ version = "1.9.2+0"
 # ╠═1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
-# ╠═38ad630c-9488-4340-878a-b74c1a77f750
 # ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
-# ╟─18428c85-668c-45e4-ad6d-0e0d43b94be7
+# ╠═18428c85-668c-45e4-ad6d-0e0d43b94be7
 # ╟─83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
 # ╟─120da197-8913-460e-86f7-24e51ad30edc
 # ╟─f9739f4e-71cf-47b0-b193-bce281c5fee8
@@ -2767,11 +2752,11 @@ version = "1.9.2+0"
 # ╠═647fdaa6-0fb8-4aee-af48-2b6254a04552
 # ╠═ba546705-6e36-4498-8a75-a0135d0f0187
 # ╟─460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
-# ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
+# ╠═6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 # ╠═fe9f245b-0c84-45ef-94da-bfc29e5c7b32
 # ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
 # ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
-# ╠═297878d6-f1b2-4073-be73-a6030c9bc294
-# ╠═8dd2bede-9731-4b8f-86a5-41d44e9d57af
+# ╟─297878d6-f1b2-4073-be73-a6030c9bc294
+# ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
