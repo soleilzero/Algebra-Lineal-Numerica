@@ -64,9 +64,9 @@ Se dispone de una **máscara de observación** $M \in \{0,1\}^{m \times n}$, don
 **Objetivo:**
 Encontrar una matriz $A_{\text{rec}}$ que:
 
-* Coincida con los valores conocidos:
-  $(A_{\text{rec}})_{i,j} = (A_{\text{obs}})_{i,j} \quad \text{si} \ M_{i,j} = 1$
-* Sea una **aproximación de rango bajo** de la imagen original.
+* coincida con los valores conocidos:
+  $(A_{\text{rec}})_{i,j} = (A_{\text{obs}})_{i,j} \quad \text{si} \ M_{i,j} = 1$ y
+* sea una **aproximación de rango bajo** de la imagen original.
 
 **Hipótesis:**
 La imagen original puede ser aproximada por una matriz de **rango bajo** debido a su estructura redundante.
@@ -155,6 +155,15 @@ Recibe una imagen $A$, una máscara $M$, un rango máximo $k$ y un máximo de it
 
 3. **Resultado final**:
    La matriz $A_{\text{rec}}$ contiene la imagen reconstruida tras las iteraciones.
+
+#### ¿Por qué funciona?
+* Suposición de rango bajo: muchas imágenes y datos reales pueden aproximarse con matrices de bajo rango.
+
+* Truncación de valores singulares impone la estructura deseada.
+
+* Proyección por máscara garantiza fidelidad con los datos observados.
+
+* La combinación iterativa converge a una aproximación razonable cuando los datos observados son suficientes y no están sesgados.
 "
 
 # ╔═╡ 8c798beb-8a08-426a-bd07-dd124b2add09
@@ -236,14 +245,6 @@ function initialize_missing(A_obs, M; method="row")
 end
 
 
-# ╔═╡ 08e7c405-b941-4011-be07-a4519a430383
-# Explicar por qué sirve para inpainting
-# De dónde salió el alg?
-# utilizar SVD propio
-# Límite miércoles
-
-# Toma 1 minuto cada svd ;/ porque es una imagen de 500x500
-
 # ╔═╡ 8558ba84-507e-4034-99fe-432afdc12087
 md"
 ### Aplicar algoritmo de in-painting por SVD
@@ -260,8 +261,61 @@ Para esto busca la matriz más sencilla (suavizada) que:
 * el truncado de rango impone regularidad y elimina el ruido,
 * las iteraciones sucesivas fuerzan que la solución sea consistente con datos conocidos
 
-#### Con funciones de Julia
 "
+
+# ╔═╡ b3172550-1162-42cd-a646-f8648b35e262
+md"
+#### Soft_impute con funciones de Julia
+"
+
+# ╔═╡ 29532b55-58b2-46ac-86c6-eda0bbf6c813
+function soft_impute(X::AbstractMatrix, mask::AbstractMatrix;
+                     λ::Float64 = 1.0,
+                     max_rank::Int = typemax(Int),
+                     max_iter::Int = 100,
+                     tol::Float64 = 1e-4)
+
+    m, n = size(X)
+    @assert size(mask) == size(X) "La máscara debe tener el mismo tamaño que la matriz X"
+
+    Z = zeros(m, n)
+    X_filled = copy(Z)
+
+    for iter in 1:max_iter
+        # Step 1: Reemplaza entradas observadas con datos originales y el resto con Z
+        for i in 1:m, j in 1:n
+            X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
+        end
+
+        # Step 2: Descomposición SVD
+        U, S, Vt = svd(X_filled)
+
+        # Step 3: Umbralización suave (soft-thresholding)
+        S_thresholded = max.(S .- λ, 0.0)
+        k = min(count(x -> x > 0.0, S_thresholded), max_rank)
+
+        # Step 4: Reconstrucción truncada
+        Z_new = U[:, 1:k] * Diagonal(S_thresholded[1:k]) * Vt[:, 1:k]'
+
+        # Step 5: Criterio de parada
+        diff = norm(Z_new - Z) / max(norm(Z), 1e-8)
+
+        Z = Z_new
+        if diff < tol
+            println("Convergió en la iteración $iter con error relativo $diff")
+            break
+        end
+    end
+
+	for i in 1:m, j in 1:n
+		X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
+	end
+    return X_filled
+end
+
+
+# ╔═╡ 5df8a1a5-ad79-4efa-b8da-af9967da6631
+md"#### Con funciones de Julia"
 
 # ╔═╡ dc78e695-4852-424e-ae63-34762cded85b
 """
@@ -305,16 +359,48 @@ md"#### Con funciones propias"
 # ╔═╡ 0d16a700-58ee-450f-b1ff-ddc4b7e147b3
 md"##### Implementación SVD"
 
-# ╔═╡ 61e867fa-a908-4cc7-beeb-90d276b9c897
-struct SVDReconstruction
-    U::Matrix{Float64}
-    S::Vector{Float64}
-    V::Matrix{Float64}
-end
+# ╔═╡ 01501b00-dbf5-46a6-963c-aef4fd675545
+md"Con dos subfunciones: `QRPivotado_` y `RealSchur`"
 
+# ╔═╡ 99b6345c-0033-48ce-9fbe-50a75bc47fc2
+function QRPivotado_(A::Matrix{Float64})
+	m, n = size(A)
+	Q = zeros(m, n)
+	R = zeros(n, n)
+	P = collect(1:n)
+	A_work = copy(A)
+	norms = [norm(A[:, j]) for j in 1:n]
+
+	for i in 1:n
+		max_col = argmax(norms[i:end]) + i - 1
+		A_work[:, [i, max_col]] = A_work[:, [max_col, i]]
+		P[[i, max_col]] = P[[max_col, i]]
+		norms[[i, max_col]] = norms[[max_col, i]]
+
+		v = A_work[:, i]
+		for j = 1:i-1
+			R[j, i] = dot(Q[:, j], v)
+			v -= R[j, i] * Q[:, j]
+		end
+		R[i, i] = norm(v)
+		Q[:, i] = v / R[i, i]
+	end
+
+	return Q, R, P
+end
 
 # ╔═╡ 5e862bcc-a235-4c5e-81a7-fc73bd04a06a
 begin
+	function RealSchur(A, iteraciones = 10000)
+		H0 = A
+		H1, Q = HessenbergForm(A)
+		δ = 10
+		for _ = 1:iteraciones
+			H0 = H1
+			H1,Q = HessenbergQR(H1,Q)
+		end
+		return H1, Q
+	end
 	function Housev(x)
 	    n = length(x)
 	    v = ones(size(x))
@@ -335,94 +421,90 @@ begin
 	    return v, β
 	end
 	
-	function HessenbergForm_(A)
-	    n = size(A, 1)
+	function HessenbergForm(A)
+	    n = size(A)[1]
 	    H = copy(A)
-	    Q = Matrix(1.0I, n, n)
+	    U = Matrix(1.0*I, n, n)
 	    for k = 1:n-2
 	        v, β = Housev(H[k+1:n, k])
-	        H[k+1:n, k:n] .= (I - β*v*v') * H[k+1:n, k:n]
-	        H[1:n, k+1:n] .= H[1:n, k+1:n] * (I - β*v*v')
-	        Q[:, k+1:n] .= Q[:, k+1:n] * (I - β*v*v')
+	        H[k+1:n, k:n] = (I - β*v*v')*H[k+1:n, k:n]
+	        H[1:n, k+1:n] = H[1:n, k+1:n]*(I - β*v*v')
+	        
+	        #U es necesaria para la verificar que la función devuelve los resultados correctos
+	        U[1:n, k+1:n] = U[1:n, k+1:n]*(I - β*v*v') 
 	    end
-	    return H, Q
+	    return H, U
 	end
 	
-	function Givens_(a, b)
-	    if b == 0
-	        return 1.0, 0.0
-	    else
-	        if abs(b) > abs(a)
-	            τ = -a / b
-	            s = 1 / sqrt(1 + τ^2)
-	            c = s * τ
-	        else
-	            τ = -b / a
-	            c = 1 / sqrt(1 + τ^2)
-	            s = c * τ
-	        end
-	        return c, s
-	    end
+	function Givens(a,b)
+		if b==0
+			c = 1
+			s = 0
+		else
+			if abs(b)>abs(a)
+				τ=-a/b
+				s=-1/sqrt(1+τ^2)
+				c=s*τ
+			else
+				τ=-b/a
+				c=1/sqrt(1+τ^2)
+				s=c*τ
+			end
+		end
+		return c,s
 	end
 	
-	function HessenbergQR_(H, Q)
-	    n = size(H, 1)
-	    for k = 1:n-1
-	        c, s = Givens_(H[k, k], H[k+1, k])
-	        G = [c -s; s c]
-	        H[k:k+1, k:n] = G * H[k:k+1, k:n]
-	        H[1:n, k:k+1] = H[1:n, k:k+1] * G'
-	        Q[:, k:k+1] = Q[:, k:k+1] * G'
-	    end
-	    return H, Q
+	function HessenbergQR(H,Q)
+		n = size(H)[1]
+		H2 = copy(H)
+		C, S = zeros(n-1), zeros(n-1)
+		
+		# Factorización QR de H
+		# Q^T*H o Givens por la izquierda
+		for k = 1:n-1
+			C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
+			H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
+			H2[k+1,k] = 0
+			Q[:, k:k+1] = Q[:, k:k+1] * [C[k] S[k]; -S[k] C[k]]  # actualizar Q
+		end
+		
+		# Matriz RQ
+		# H*Q o Givens por la derecha
+		for k = 1:n-1
+			H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
+		end
+		
+		return H2,Q
 	end
-	
-	function RealSchur_(A, iteraciones = 10000)
-	    H, Q = HessenbergForm_(A)
-	    for _ = 1:iteraciones
-	        H, Q = HessenbergQR_(H, Q)
-	    end
-	    return H, Q
-	end
+end
 
-	function QRPivotado_(A::Matrix{Float64})
-	    m, n = size(A)
-	    Q = zeros(m, n)
-	    R = zeros(n, n)
-	    P = collect(1:n)
-	    A_work = copy(A)
-	    norms = [norm(A[:, j]) for j in 1:n]
+# ╔═╡ 61e867fa-a908-4cc7-beeb-90d276b9c897
+struct SVDReconstruction
+    U::Matrix{Float64}
+    S::Vector{Float64}
+    V::Matrix{Float64}
+end
+
+
+# ╔═╡ b649cd99-5310-4ba5-99fe-bd9c4583c54c
+function naiveSVD_classic_(A::Matrix{Float64})
+	#Paso 1
+	C = transpose(A) * A
 	
-	    for i in 1:n
-	        max_col = argmax(norms[i:end]) + i - 1
-	        A_work[:, [i, max_col]] = A_work[:, [max_col, i]]
-	        P[[i, max_col]] = P[[max_col, i]]
-	        norms[[i, max_col]] = norms[[max_col, i]]
-	
-	        v = A_work[:, i]
-	        for j = 1:i-1
-	            R[j, i] = dot(Q[:, j], v)
-	            v -= R[j, i] * Q[:, j]
-	        end
-	        R[i, i] = norm(v)
-	        Q[:, i] = v / R[i, i]
-	    end
-	
-	    return Q, R, P
-	end
-	
-	function naiveSVD_classic_(A::Matrix{Float64})
-	    C = transpose(A) * A
-	    T, V = RealSchur_(C)
-	    λ = diag(T)
-	    σ = sqrt.(abs.(λ))
-	    orden = sortperm(σ, rev=true)
-	    σ = σ[orden]
-	    V = V[:, orden]
-	    AV = A * V
-	    U, _, _ = QRPivotado_(AV)
-	    return SVDReconstruction(U, σ, V)
-	end	
+	#Paso 2
+	T, V = RealSchur(C)
+	λ = diag(T)
+	σ = sqrt.(abs.(λ))
+
+	#Reorden
+	orden = sortperm(σ, rev=true)
+	σ = σ[orden]
+	V = V[:, orden]
+
+	#Paso 3
+	AV = A * V
+	U, _, _ = QRPivotado_(AV)
+	return SVDReconstruction(U, σ, V)
 end
 
 # ╔═╡ 219e47ad-96ad-4be7-965b-30c209c5903f
@@ -486,7 +568,7 @@ En las gráficas podremos ver, en orden:
 
 # ╔═╡ 96af3132-6566-4cb7-a210-3d019467550d
 begin
-	matrix_ex1 = Float64.(Gray.(load("imagen_ejemplo.png")))
+	#matrix_ex1 = Float64.(Gray.(load("imagen_ejemplo.png")))
 	mask_ex1 = generate_mask(matrix_ex1, .95)
 	init_ex1 = initialize_missing(matrix_ex1, mask_ex1; method="global");
 	
@@ -500,7 +582,7 @@ end
 
 # ╔═╡ 5b2ba4a0-448a-4300-a259-da1d02ac1bbd
 begin
-	matrix_ex2 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
+	#matrix_ex2 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
 	mask_ex2 = generate_mask(matrix_ex2, .6)
 	init_ex2 = initialize_missing(matrix_ex2, mask_ex2; method="global");
 	
@@ -512,20 +594,17 @@ begin
 )
 end
 
-# ╔═╡ ea1238d1-608d-41d3-a8b2-f808d105f909
-naiveSVD_classic_(matrix_ex2)
-
 # ╔═╡ 6cfccb92-ccb7-49de-92bc-e1ae971b68db
-matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2, 10, 3)
+matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2, 10, 1)
 
 # ╔═╡ 04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
 begin
 	init_ex5 = initialize_missing(matrix_ex2, mask_ex2; method="global");
-	matrix6 = svd_inpainting_manual(init_ex5, mask_ex2, 10, 3)
+	matrix6 = svd_inpainting_manual(init_ex5, mask_ex2, 10, 1)
 end
 
 # ╔═╡ 08838687-83a8-4a94-8420-973b17645834
-	mosaicview(
+mosaicview(
 	Gray.(matrix5),
 	Gray.(matrix6),
 	Gray.(init_ex5); 
@@ -539,17 +618,29 @@ mosaicview(
 	ncol=2
 )
 
+# ╔═╡ 38ad630c-9488-4340-878a-b74c1a77f750
+begin
+	matrix_ex3 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
+	mask_ex3 = generate_mask(matrix_ex3, .6)
+	svd_inpainting(matrix_ex3, mask_ex3, 10, 10)
+end
+
+# ╔═╡ c3df9380-c344-4434-ba11-5f46bbc22a3a
+Z_hat = soft_impute(matrix_ex3, mask_ex3; λ=0.5, max_rank=5, max_iter=200)
+
+# ╔═╡ 91363b9f-26c8-47b8-8ac8-981ff2286ec9
+Gray.(Z_hat)
+
+# ╔═╡ 56d07be9-32ee-4741-aab3-024abf299d5c
+mask_ex3
+
+# ╔═╡ 6e4f0a3d-31f8-4fe5-a6d2-328f584e5aaf
+Gray.(matrix_ex3)
+
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
 ## Experimentos y análisis
-Con daño simulado: 
-* calcular errores contra la original
-
-Con daño real:
-* mostrar que se puede hacer (análisis subjetivo)
-
-Ambos:
-* Comparación visual para diferentes valores en la restitución (k y max_iter)
+Realicemos una comparación visual para diferentes valores en la restitución ($k$ y $max_iter$)
 "
 
 # ╔═╡ 18428c85-668c-45e4-ad6d-0e0d43b94be7
@@ -615,7 +706,7 @@ function compare_initilizations(A, mask; k=50, max_iter=10, ncol=4, verbose=fals
 		println("Orden de las imágenes: ", collect(keys(recs)))
 	end
 	show_reconstructions(recs, ncol=ncol)
-end
+#end
 
 
 # ╔═╡ 702f99ea-3c58-4782-98dd-6dceddbf767c
@@ -730,6 +821,9 @@ Se utilizó **ChatGPT (OpenAI)** de forma activa para:
 * Golub, G., & Van Loan, C. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.
 
 """
+
+# ╔═╡ 3c643907-b46a-4100-80ee-06de6cd12770
+
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2645,14 +2739,22 @@ version = "1.9.2+0"
 # ╟─dfa2de65-b023-4c75-99bd-e714861ad46f
 # ╟─aa48a83d-6310-4713-9f9c-43644265bafd
 # ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
-# ╠═08e7c405-b941-4011-be07-a4519a430383
-# ╟─8558ba84-507e-4034-99fe-432afdc12087
+# ╠═8558ba84-507e-4034-99fe-432afdc12087
+# ╟─b3172550-1162-42cd-a646-f8648b35e262
+# ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
+# ╠═c3df9380-c344-4434-ba11-5f46bbc22a3a
+# ╠═56d07be9-32ee-4741-aab3-024abf299d5c
+# ╠═6e4f0a3d-31f8-4fe5-a6d2-328f584e5aaf
+# ╠═91363b9f-26c8-47b8-8ac8-981ff2286ec9
+# ╟─5df8a1a5-ad79-4efa-b8da-af9967da6631
 # ╠═dc78e695-4852-424e-ae63-34762cded85b
 # ╟─bf1d46b6-2d5f-451c-83ac-cdbe062f245c
 # ╟─0d16a700-58ee-450f-b1ff-ddc4b7e147b3
-# ╠═5e862bcc-a235-4c5e-81a7-fc73bd04a06a
-# ╠═61e867fa-a908-4cc7-beeb-90d276b9c897
-# ╠═ea1238d1-608d-41d3-a8b2-f808d105f909
+# ╟─b649cd99-5310-4ba5-99fe-bd9c4583c54c
+# ╟─01501b00-dbf5-46a6-963c-aef4fd675545
+# ╟─99b6345c-0033-48ce-9fbe-50a75bc47fc2
+# ╟─5e862bcc-a235-4c5e-81a7-fc73bd04a06a
+# ╟─61e867fa-a908-4cc7-beeb-90d276b9c897
 # ╟─219e47ad-96ad-4be7-965b-30c209c5903f
 # ╠═3c11aae2-81c9-47bf-aca2-78567afc4972
 # ╠═20b98000-d061-4f7b-a9aa-da4fb421cf59
@@ -2666,7 +2768,8 @@ version = "1.9.2+0"
 # ╠═1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
-# ╠═72177df0-5329-4f71-88ce-25f6427aa8b8
+# ╠═38ad630c-9488-4340-878a-b74c1a77f750
+# ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
 # ╟─18428c85-668c-45e4-ad6d-0e0d43b94be7
 # ╟─83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
 # ╟─120da197-8913-460e-86f7-24e51ad30edc
@@ -2683,7 +2786,8 @@ version = "1.9.2+0"
 # ╠═fe9f245b-0c84-45ef-94da-bfc29e5c7b32
 # ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
 # ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
-# ╟─297878d6-f1b2-4073-be73-a6030c9bc294
-# ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
+# ╠═297878d6-f1b2-4073-be73-a6030c9bc294
+# ╠═8dd2bede-9731-4b8f-86a5-41d44e9d57af
+# ╠═3c643907-b46a-4100-80ee-06de6cd12770
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
