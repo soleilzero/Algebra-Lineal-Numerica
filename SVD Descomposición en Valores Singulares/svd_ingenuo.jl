@@ -63,7 +63,7 @@ Las cantidades $\sigma_i$ se llaman **valores singulares** de $A$, y son únicos
 
 #### Importancia de la SVD
 
-La importancia de la descomposición SVD está basada en que **caracteriza cualquier** matriz real \( A \in \mathbb{R}^{m \times n} \), sin importar que sea cuadrada, rectangular, singular o no.
+La importancia de la descomposición SVD está basada en que **caracteriza cualquier** matriz real $A \in \mathbb{R}^{m \times n}$, sin importar que sea cuadrada, rectangular, singular o no.
 
 #### Intuición geométrica
 
@@ -78,7 +78,11 @@ En otras palabras, toda matriz real lineal puede descomponerse como una secuenci
 "
 
 # ╔═╡ 8c4925b3-70c8-4d63-9140-1ba1a541f14d
-md"## Implementación"
+md"
+## Implementación
+En este cuaderno compararemos dos métodos diferentes de descomposición SVD:
+el `svd` ya implementado de la librería `Linear Algebra` de Julia y una implementación propia del método ingenuo.
+"
 
 # ╔═╡ 4c28ca44-c61b-4db4-87e1-eb00fb467246
 md"### Set up"
@@ -92,45 +96,12 @@ end
 
 
 # ╔═╡ 41c1603c-6101-4bee-b66a-3f88dacce14d
-md"### SVD de Julia"
+md"
+### SVD de Julia
+"
 
 # ╔═╡ a4858212-5dd0-406a-ac48-314dbb539517
 svd
-
-# ╔═╡ 7066f320-5339-40db-bdda-1e1c396e6fc1
-md"### SVD usando un QR de Julia"
-
-# ╔═╡ 293b240e-fd3b-48e4-ba3c-d5e337fd4d2f
-"""
-Calcula la SVD de A utilizando el enfoque clásico basado en formar C = AᵀA.
-Paso 1: Formar C = AᵀA
-Paso 2: Calcular la descomposición espectral de C = VΛVᵀ usando QR simétrico
-Paso 3: Calcular AV = QR para obtener U
-Devuelve U, Σ, Vᵀ
-"""
-function svd_via_ata(A::Matrix{Float64})
-    m, n = size(A)
-
-    # Step 1: Form the symmetric matrix C = AᵀA
-    C = A' * A
-
-    # Step 2: Compute eigen-decomposition of C = VΛVᵀ
-    # This corresponds to applying the symmetric QR algorithm to C
-    quadratic_σ, V = eigen(Symmetric(C))
-    σ = sqrt.(clamp.(quadratic_σ, 0.0, Inf))
-
-	# Orden
-	orden = sortperm(σ, rev=true)
-    σ = σ[orden]
-    V = V[:, orden]
-
-    # Step 3: Compute AV = QR to obtain U
-    AV = A * V
-    Q, _ = qr(AV)  # QR
-    U = Matrix(Q[:, 1:n]) # Get full Q
-
-    return SVDReconstruction(U, σ, V)
-end
 
 # ╔═╡ d0cfe9c6-04ba-47af-b466-3763cbae0364
 md"
@@ -368,12 +339,6 @@ begin
 	display(A)
 end
 
-# ╔═╡ 59e48f61-049f-4708-a474-293c289f4539
-begin
-	F2 = svd_via_ata(A)
-	validate_svd(A,F2)
-end
-
 # ╔═╡ ce85b232-ec3d-4d1c-84d5-420f9911ac24
 sort(eigen(C).values, rev=true)
 
@@ -392,12 +357,6 @@ begin
 	validate_svd(A, s1)
 end
 
-# ╔═╡ cb6b4738-a3c5-413a-9a28-108af85fb249
-begin
-	s2=svd_via_ata(A)
-	validate_svd(A, s2)
-end
-
 # ╔═╡ 3abe59da-bf9d-4703-b584-d378dcbec887
 begin
 	s3=naiveSVD_classic_(A)
@@ -411,7 +370,7 @@ Comparemos la diferencia de tiempo y de exactitud entre los diferentes métodos 
 "
 
 # ╔═╡ c5673905-25f5-4b62-9457-2ecf584ed11e
-ns = 25:25:500
+ns = 50:50:500
 
 # ╔═╡ 499f51b5-20b5-4cb8-a608-3647c81a1f33
 begin
@@ -492,26 +451,46 @@ Podemos observar que al comparar el `svd` de Julia con el método `naiveSVD_clas
 
 # ╔═╡ b250760b-efa2-46df-a1e4-656547a6d3d9
 md"""
-## Reflexión y aprendizajes
+## Contribución y reflexión
+
+El desarrollo del código y análisis presentados en este cuaderno fue realizado por el estudiante, con las siguientes contribuciones específicas:
+
+* **Adaptación del código base:** Se partió del código proporcionado por el profesor en Classroom, el cual fue modificado para que las funciones devolvieran no solo la matriz transformada, sino también la información ortogonal necesaria para su uso posterior en la implementación ingenua de la SVD.
+
+* **Diseño experimental:** Se diseñaron y ejecutaron pruebas comparativas de desempeño entre el svd de Julia y la implementación ingenua, para diferentes tamaños de matrices. Esto incluyó la medición de tiempos de ejecución y errores de reconstrucción, así como la organización visual de los resultados.
+
+* **Análisis de resultados:** Se interpretaron los resultados numéricos y se redactaron conclusiones sobre la precisión y eficiencia de cada método, destacando fortalezas y limitaciones del enfoque ingenuo frente al método optimizado de Julia.
 
 El principal aprendizaje que me dejó este notebook fue la importancia de la comunicación, dado que inicialmente no tenía claras las instrucciones y estaba haciendo un trabajo innecesario.
 
 ## Declaración sobre el uso de inteligencia artificial y fuentes externas
 
-Durante la realización de este trabajo se utilizó **asistencia de inteligencia artificial (IA)** para generar y mejorar partes del código y de los textos explicativos, con el fin de estructurar mejor el contenido y optimizar la implementación.
+Durante la realización de este trabajo se utilizó **asistencia de inteligencia artificial (IA)** para generar y mejorar partes del código y de fuentes externas, con el fin de estructurar mejor el contenido y optimizar la implementación.
 
 ### Uso de IA:
 
-Se utilizó **ChatGPT (OpenAI)** de forma activa para la generación y refactorización de código en Julia.
+En la elaboración de este cuaderno se utilizó inteligencia artificial (IA), específicamente ChatGPT (OpenAI), como herramienta de apoyo para:
 
-**Algunos prompts utilizados:**
+* Generar código en Julia para implementar una versión ingenua de la descomposición en valores singulares (SVD), incluyendo el uso de algoritmos QR propios.
 
-* "¿A qué se debe este error: `MethodError: no method matching iterate(::Main.var"workspace#25".SVDReconstruction)`? "
+* Redactar explicaciones matemáticas, comentarios de código y secciones interpretativas del comportamiento numérico de los algoritmos.
 
----
+* Reformular fragmentos de texto para mejorar la claridad y redacción técnica.
+
+Los principales prompts utilizados fueron del estilo:
+
+* "Cómo puedo mostrar los resultados de tiempos_naive y tiempos_julia en dos columnas contiguas"
+
+* "¿Puedes explicar esta función paso a paso?"
+
+* "Reescribe este párrafo de forma clara y académica."
+
+Se supervisó cuidadosamente cada respuesta de la IA para verificar su validez, coherencia matemática y relevancia dentro del contexto del trabajo.
 
 ### Fuentes externas consultadas:
 
+* Código guía de la clase, cuaderno `SchurFinal.jl`
+* Marangoz, S. (2023). *Image Imputation with SVD*. [https://salihmarangoz.github.io/blog/Image-Imputation-with-SVD](https://salihmarangoz.github.io/blog/Image-Imputation-with-SVD)
 * Golub, G., & Van Loan, C. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.
 
 """
@@ -1727,9 +1706,6 @@ version = "1.9.2+0"
 # ╠═11f75b56-81b0-4ea8-9689-4721e2c29a34
 # ╟─41c1603c-6101-4bee-b66a-3f88dacce14d
 # ╠═a4858212-5dd0-406a-ac48-314dbb539517
-# ╟─7066f320-5339-40db-bdda-1e1c396e6fc1
-# ╠═293b240e-fd3b-48e4-ba3c-d5e337fd4d2f
-# ╠═59e48f61-049f-4708-a474-293c289f4539
 # ╟─d0cfe9c6-04ba-47af-b466-3763cbae0364
 # ╠═ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
 # ╟─921e6808-b9e7-493f-8042-6f8e5419a117
@@ -1750,12 +1726,11 @@ version = "1.9.2+0"
 # ╟─de203fde-bd13-4b46-a0cb-8af4407ef83f
 # ╠═ecf2900a-b0f7-4a65-bc20-0b0671ef30ad
 # ╠═4806679c-71bf-431a-9464-93689e696a35
-# ╠═cb6b4738-a3c5-413a-9a28-108af85fb249
 # ╠═3abe59da-bf9d-4703-b584-d378dcbec887
 # ╟─11f0b923-7334-4d85-ad53-0118d7f21862
 # ╠═c5673905-25f5-4b62-9457-2ecf584ed11e
 # ╠═499f51b5-20b5-4cb8-a608-3647c81a1f33
-# ╠═52d02aa0-c9b7-4f62-9fed-48630114297f
+# ╟─52d02aa0-c9b7-4f62-9fed-48630114297f
 # ╠═cdecd567-bce8-4e40-af99-1687a8dcef80
 # ╠═5a4f081d-b0b6-42aa-b12a-ac4885ba58ba
 # ╟─f3b6c188-b927-4565-be96-9e4407289d6f
