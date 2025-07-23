@@ -176,12 +176,6 @@ validate_svd(A, s1; V_transposed=true) #no sirve
 # ╔═╡ b460bc19-8641-47ba-89e6-06faf66f53ac
 md"Y para matrices grandes, toma bastante tiempo"
 
-# ╔═╡ 82d13c2a-f64d-447a-9b4b-371f2d3d50c2
-begin
-	D=rand(500,500)
-	#s4=naiveSVD_classic_(D)
-end
-
 # ╔═╡ 41c1603c-6101-4bee-b66a-3f88dacce14d
 md"### SVD de Julia"
 
@@ -301,55 +295,48 @@ begin
 	end
 	
 	function Housev(x)
-    n = length(x)
-    v = ones(size(x))
-    v[2:n] = x[2:n]
-    σ = norm(x[2:n])^2
-    if σ == 0
-        β = 0
-    else 
-        μ = √(x[1]^2+σ)
-        if x[1] ≤ 0
-            v[1] = x[1] - μ
-        else
-            v[1] = -σ/(x[1]+μ)
-        end
-        β = 2*v[1]^2/(σ+v[1]^2)
-        v = v/(v[1])
-    end
-    return v, β
-end
-end
-
-# ╔═╡ af05a8ab-8a80-49c3-b5c9-78a80d257490
-H, Q = HessenbergForm(A)
-
-# ╔═╡ 6a3a3959-b7aa-4a07-82ba-7be858463acc
-HessenbergQR_(H, Q)
-
-# ╔═╡ 9affa8ea-51cd-4a7b-95e4-e79eedd291fa
-begin
-	function Givens(a,b)
-	    if b==0
-	        c = 1
-	        s = 0
-	    else
-	        if abs(b)>abs(a)
-	            τ=-a/b
-	            s=-1/sqrt(1+τ^2)
-	            c=s*τ
+	    n = length(x)
+	    v = ones(size(x))
+	    v[2:n] = x[2:n]
+	    σ = norm(x[2:n])^2
+	    if σ == 0
+	        β = 0
+	    else 
+	        μ = √(x[1]^2+σ)
+	        if x[1] ≤ 0
+	            v[1] = x[1] - μ
 	        else
-	            τ=-b/a
-	            c=1/sqrt(1+τ^2)
-	            s=c*τ
+	            v[1] = -σ/(x[1]+μ)
 	        end
+	        β = 2*v[1]^2/(σ+v[1]^2)
+	        v = v/(v[1])
 	    end
-	    return c,s
+	    return v, β
+	end
+	
+	begin
+		function Givens(a,b)
+		    if b==0
+		        c = 1
+		        s = 0
+		    else
+		        if abs(b)>abs(a)
+		            τ=-a/b
+		            s=-1/sqrt(1+τ^2)
+		            c=s*τ
+		        else
+		            τ=-b/a
+		            c=1/sqrt(1+τ^2)
+		            s=c*τ
+		        end
+		    end
+		    return c,s
+		end
 	end
 end
 
-# ╔═╡ ac0ce702-5986-47a2-982a-151a1d8049f1
-function HessenbergQR(H)
+# ╔═╡ a66ef3b2-602e-4bf6-801f-b44e6af58404
+function HessenbergQR(H,Q)
 	n = size(H)[1]
 	H2 = copy(H)
 	C, S = zeros(n-1), zeros(n-1)
@@ -360,6 +347,7 @@ function HessenbergQR(H)
 		C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
 		H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
 		H2[k+1,k] = 0
+		Q[:, k:k+1] = Q[:, k:k+1] * [C[k] S[k]; -S[k] C[k]]  # actualizar Q
 	end
 	
 	# Matriz RQ
@@ -368,11 +356,33 @@ function HessenbergQR(H)
 		H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
 	end
 	
-	return H2 #RQ Hessenberg superior
+	return H2,Q
 end
 
-# ╔═╡ 275b46e5-30a4-4378-b58b-9c9685d81e92
-HessenbergQR(H)
+# ╔═╡ af05a8ab-8a80-49c3-b5c9-78a80d257490
+begin
+	H, Q = HessenbergForm(A)
+	HessenbergQR(H,Q)
+end
+
+# ╔═╡ f2647a91-cb20-4740-97ef-dcb6efc38e88
+function RealSchur(A, iteraciones = 10000)
+    H0 = A
+    H1, Q = HessenbergForm(A)
+    δ = 10
+    for _ = 1:iteraciones
+        H0 = H1
+        H1,Q = HessenbergQR(H1,Q)
+    end
+    return H1, Q
+    
+end
+
+# ╔═╡ e16a2c37-32fa-4476-a6c2-69889d532e16
+Diagonal(RealSchur(C)[1])
+
+# ╔═╡ 240d8bff-c900-4126-b906-3d7d7b9d0e56
+RealSchur(C)[2]
 
 # ╔═╡ 17ff8c7b-b0aa-4490-8d53-20eb82e9764d
 md"### Paso 3: Apply QR with column pivoting to $AV$ to obtain $U^T (AV)N =R$ "
@@ -399,103 +409,6 @@ md"
 ### Versión nueva
 Queremos un Real Schur que devuelva también Q, la única diferencia con el original es que HessenberQR también debe devolver Q.
 "
-
-# ╔═╡ 04180e6b-b665-4c3b-8200-f5affa39a7e8
-function RealSchur_(A, iteraciones = 10000)
-	H, Q = HessenbergForm(A)
-	for _ = 1:iteraciones
-		H, Q = HessenbergQR_(H, Q)
-	end
-	return H, Q
-end
-
-# ╔═╡ 042dcfd5-d944-417d-a18a-ed982874c185
-Diagonal(RealSchur_(C)[1])
-
-# ╔═╡ 21095a5d-1f28-4c4c-a134-e2a83e20573d
-RealSchur_(C)[2]
-
-# ╔═╡ 596ea23f-236c-4abf-8c06-1e3682bc94dd
-function naiveSVD_classic(A::Matrix{Float64})
-    C = transpose(A) * A  # Paso 1: matriz simétrica
-
-    T, V = RealSchur_(C)  # Paso 2: tu algoritmo Schur (QR iterado con Gram-Schmidt)
-
-    λ = diag(T)
-    σ = sqrt.(abs.(λ))  # valores singulares
-
-    # Ordenar por valores singulares decrecientes
-    orden = sortperm(σ, rev=true)
-    σ = σ[orden]
-    V = V[:, orden]
-
-    # Paso 3: calcular U = AV / σ
-    m, n = size(A)
-    U = zeros(m, n)
-    for i in 1:n
-        vi = V[:, i]
-        Avi = A * vi
-        normi = norm(Avi)
-        if normi > 1e-10
-            U[:, i] = Avi / normi
-        end
-    end
-
-    return SVDReconstruction(U, σ, V)
-end
-
-
-# ╔═╡ e8dcce43-1070-46d8-b74b-cd546cbd593a
-s4=naiveSVD_classic(A)
-
-# ╔═╡ 8d60fa96-0c4b-44a9-b6cb-d19e1165d948
-validate_svd(A, s4)
-
-# ╔═╡ a66ef3b2-602e-4bf6-801f-b44e6af58404
-function HessenbergQR__(H,Q)
-	n = size(H)[1]
-	H2 = copy(H)
-	C, S = zeros(n-1), zeros(n-1)
-	
-	# Factorización QR de H
-	# Q^T*H o Givens por la izquierda
-	for k = 1:n-1
-		C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
-		H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
-		H2[k+1,k] = 0
-		Q[:, k:k+1] = Q[:, k:k+1] * [C[k] S[k]; -S[k] C[k]]  # actualizar Q
-	end
-	
-	# Matriz RQ
-	# H*Q o Givens por la derecha
-	for k = 1:n-1
-		H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
-	end
-	
-	return H2,Q
-end
-
-# ╔═╡ 81719b8d-37c7-4f12-a698-6f64f073b11f
-HessenbergQR__(H, Q)
-
-# ╔═╡ f2647a91-cb20-4740-97ef-dcb6efc38e88
-function RealSchur(A, iteraciones = 10000)
-    H0 = A
-    H1, Q = HessenbergForm(A)
-    δ = 10
-    for _ = 1:iteraciones
-        H0 = H1
-        H1,Q = HessenbergQR__(H1,Q)
-    end
-    return H1, Q
-    
-end
-
-# ╔═╡ e16a2c37-32fa-4476-a6c2-69889d532e16
-Diagonal(RealSchur(C)[1])
-
-# ╔═╡ 240d8bff-c900-4126-b906-3d7d7b9d0e56
-RealSchur(C)[2]
 
 # ╔═╡ f2a6c197-13a8-468e-bb43-61f6010bdae3
 md"#### Ahora...."
@@ -530,7 +443,7 @@ end
 # ╔═╡ ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
 function naiveSVD_classic_(A::Matrix{Float64})
 	C = transpose(A) * A
-	T, V = RealSchur_(C)
+	T, V = RealSchur(C)
 	λ = diag(T)
 	σ = sqrt.(abs.(λ))
 	orden = sortperm(σ, rev=true)
@@ -549,6 +462,15 @@ validate_svd(A, s3) #sirve más o menos
 
 # ╔═╡ 5e2753e3-bb12-442c-992e-0ac11a147f57
 validate_svd(A, s3; V_transposed=true)
+
+# ╔═╡ 82d13c2a-f64d-447a-9b4b-371f2d3d50c2
+begin
+	D=rand(500,500)
+	s5=naiveSVD_classic_(D)
+end
+
+# ╔═╡ e7a42900-4c04-4baa-94b6-a0a2254f5177
+svd(D)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -597,7 +519,7 @@ version = "5.11.0+0"
 # ╟─9c09483c-6619-11f0-339c-3132d4ffd563
 # ╟─71039e0e-48ff-4953-b400-ce22494ff56a
 # ╟─b250760b-efa2-46df-a1e4-656547a6d3d9
-# ╠═69ad41a3-b775-4168-a3c7-218d45eaa0d5
+# ╟─69ad41a3-b775-4168-a3c7-218d45eaa0d5
 # ╟─8c4925b3-70c8-4d63-9140-1ba1a541f14d
 # ╟─36cc1bce-5264-4f14-8e79-ab83320e083d
 # ╠═bf0426ff-6f2c-4bb7-b3bb-0017d99e81c7
@@ -610,19 +532,18 @@ version = "5.11.0+0"
 # ╠═33b3d729-7315-4c60-9854-48d9a246cd32
 # ╠═df587928-e939-4d20-a959-eb4128980bed
 # ╠═6f6f3e46-7164-4200-88fb-3a437543986f
-# ╠═e8dcce43-1070-46d8-b74b-cd546cbd593a
 # ╟─b3b5bc5b-c93d-4f92-9d89-33165587bf1e
 # ╠═578c849f-0760-41a6-b6f2-0a225afddeb8
 # ╟─318ce551-45b6-4d04-ba66-4d622051807d
 # ╠═210b22b9-13e6-4d29-a1f4-6d0e85bf45a6
 # ╠═fa7fafbc-04d3-4c69-9aad-4ee86fcffba6
 # ╠═c80c0ecf-1b44-445f-a990-d044e4d4280c
-# ╠═8d60fa96-0c4b-44a9-b6cb-d19e1165d948
 # ╟─a0236861-049d-40c3-9069-70029c13bc69
 # ╠═8c02d86c-9479-4df8-a94f-8489406a5356
 # ╠═83cb9d8a-b759-473e-9d2e-52b6fb5f2054
 # ╠═5e2753e3-bb12-442c-992e-0ac11a147f57
 # ╟─b460bc19-8641-47ba-89e6-06faf66f53ac
+# ╠═e7a42900-4c04-4baa-94b6-a0a2254f5177
 # ╠═82d13c2a-f64d-447a-9b4b-371f2d3d50c2
 # ╟─41c1603c-6101-4bee-b66a-3f88dacce14d
 # ╠═a4858212-5dd0-406a-ac48-314dbb539517
@@ -636,28 +557,19 @@ version = "5.11.0+0"
 # ╟─9e7998ae-f91b-424b-bca8-05fcd71064ec
 # ╠═ce85b232-ec3d-4d1c-84d5-420f9911ac24
 # ╠═e16a2c37-32fa-4476-a6c2-69889d532e16
-# ╠═042dcfd5-d944-417d-a18a-ed982874c185
 # ╟─e8606e61-cbaf-4062-8c4f-abb653737919
 # ╠═b88b2e64-6c79-461c-a89e-ee816bd4a2ba
 # ╠═240d8bff-c900-4126-b906-3d7d7b9d0e56
-# ╠═21095a5d-1f28-4c4c-a134-e2a83e20573d
 # ╟─1e0bd262-f985-44c9-8e4f-136fc43b6390
 # ╠═af05a8ab-8a80-49c3-b5c9-78a80d257490
-# ╠═275b46e5-30a4-4378-b58b-9c9685d81e92
-# ╠═81719b8d-37c7-4f12-a698-6f64f073b11f
-# ╠═6a3a3959-b7aa-4a07-82ba-7be858463acc
-# ╠═ac0ce702-5986-47a2-982a-151a1d8049f1
+# ╠═a66ef3b2-602e-4bf6-801f-b44e6af58404
 # ╟─e2df08c4-245e-48d8-b680-539d9b12adda
 # ╠═f2647a91-cb20-4740-97ef-dcb6efc38e88
 # ╠═b32ef216-4e64-44aa-9e84-1bedbccabac3
-# ╠═9affa8ea-51cd-4a7b-95e4-e79eedd291fa
 # ╟─17ff8c7b-b0aa-4490-8d53-20eb82e9764d
 # ╟─ce61ed2c-354e-461b-b654-aaf02202fc7e
-# ╠═596ea23f-236c-4abf-8c06-1e3682bc94dd
 # ╟─79b9956c-b3b5-4747-b919-dd4b9fc604bb
 # ╟─491e85bc-2104-4908-8797-194c89cf1f7f
-# ╠═04180e6b-b665-4c3b-8200-f5affa39a7e8
-# ╠═a66ef3b2-602e-4bf6-801f-b44e6af58404
 # ╟─f2a6c197-13a8-468e-bb43-61f6010bdae3
 # ╠═de232181-3366-4949-a7a4-6dabbcc10cc2
 # ╠═ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
