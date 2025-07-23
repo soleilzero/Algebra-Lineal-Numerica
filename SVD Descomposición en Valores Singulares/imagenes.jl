@@ -28,8 +28,6 @@ Comprender, aplicar y analizar el método de restitución de imágenes incomplet
 * Implementar un algoritmo iterativo de completado de matrices para recuperar imágenes dañadas o incompletas, preservando los valores conocidos y reconstruyendo las regiones faltantes,
 
 * Evaluar la calidad de la restitución mediante métricas cuantitativas y análisis visual comparativo.
-
-* (Opcional) Explorar la aplicación del método tanto en imágenes con daño artificial como en imágenes deterioradas o incompletas provenientes de fuentes reales.
 "
 
 # ╔═╡ 36313e11-d39d-4688-969f-a217a87ba03a
@@ -80,6 +78,8 @@ Resolver el problema mediante un **método iterativo** basado en SVD, que recons
 md"
 
 ## Teoría
+
+Veamos los conceptos relevantes y la definición del algoritmo.
 ### Rango de una matriz
 
 El rango de una matriz corresponde al número máximo de columnas (o filas) linealmente independientes que tiene la matriz. Es una medida de la *dimensión* del espacio generado por sus columnas o filas.
@@ -177,10 +177,22 @@ Si el cambio relativo es suficientemente pequeño (< tol), paramos.
 # ╔═╡ 8c798beb-8a08-426a-bd07-dd124b2add09
 md"
 ## Implementación
+Implementamos las funciones necesarias para el algoritmo inpainting por SVD.
 "
 
+# ╔═╡ 61e867fa-a908-4cc7-beeb-90d276b9c897
+struct SVDReconstruction
+    U::Matrix{Float64}
+    S::Vector{Float64}
+    V::Matrix{Float64}
+end
+
+
 # ╔═╡ 6c71642a-b1e0-4866-b304-aec85e4d71f1
-md"### Generar máscara de observación"
+md"
+### Generar máscara de observación
+La máscara de observación permite al algoritmo saber qué valores debe cambiar y qué valores no.
+"
 
 # ╔═╡ dfa2de65-b023-4c75-99bd-e714861ad46f
 """
@@ -198,75 +210,21 @@ function generate_mask(img, threshold=0.95)
 end
 
 
-# ╔═╡ 8558ba84-507e-4034-99fe-432afdc12087
+# ╔═╡ d546204d-3ba2-4483-b6c9-1eb1bdb0ec30
 md"
-### Aplicar algoritmo de in-painting por SVD
-
-**¿Qué hace el algoritmo?**
-
-Es un algoritmo iterativo que rellena los valores faltantes de una matriz (por ejemplo, una imagen dañada).
-Para esto busca la matriz más sencilla (suavizada) que:
-* Respete los valores conocidos.
-* Tenga rango bajo.
+### Descomposición SVD
+El corazón del algoritmo, genera la aproximación de la imagen.
+Utilizaremos dos: el `svd` de la librería LinearAlgebra de Julia y el `naiveSVD_classic_` trabajado en el cuaderno `svd_ingenuo.jl`
 "
 
-# ╔═╡ 5df8a1a5-ad79-4efa-b8da-af9967da6631
-md"#### Con funciones de Julia"
+# ╔═╡ 2b8d70a8-6ae9-47c2-bf6f-01cbd402cb47
+md"De la librería LinearAlgebra de Julia:"
 
-# ╔═╡ 29532b55-58b2-46ac-86c6-eda0bbf6c813
-"""
-Realiza el completado de matrices dañadas con el algoritmo SoftImpute.
-"""
-function svd_inpainting(X::AbstractMatrix, mask::AbstractMatrix;
-                     λ::Float64 = 1.0,
-                     max_rank::Int = typemax(Int),
-                     max_iter::Int = 100,
-                     tol::Float64 = 1e-4)
+# ╔═╡ a195f049-fd18-48da-91f1-79784acf7fc2
+svd
 
-    m, n = size(X)
-    @assert size(mask) == size(X) "La máscara debe tener el mismo tamaño que la matriz X"
-
-    Z = zeros(m, n)
-    X_filled = copy(Z)
-
-    for iter in 1:max_iter
-        # Step 1: Reemplaza entradas observadas con datos originales y el resto con Z
-        for i in 1:m, j in 1:n
-            X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
-        end
-
-        # Step 2: Descomposición SVD
-        U, S, Vt = svd(X_filled)
-
-        # Step 3: Umbralización suave (soft-thresholding)
-        S_thresholded = max.(S .- λ, 0.0)
-        k = min(count(x -> x > 0.0, S_thresholded), max_rank)
-
-        # Step 4: Reconstrucción truncada
-        Z_new = U[:, 1:k] * Diagonal(S_thresholded[1:k]) * Vt[:, 1:k]'
-
-        # Step 5: Criterio de parada
-        diff = norm(Z_new - Z) / max(norm(Z), 1e-8)
-
-        Z = Z_new
-        if diff < tol
-            println("Convergió en la iteración $iter con error relativo $diff")
-            break
-        end
-    end
-
-	for i in 1:m, j in 1:n
-		X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
-	end
-    return X_filled
-end
-
-
-# ╔═╡ bf1d46b6-2d5f-451c-83ac-cdbe062f245c
-md"#### Con funciones propias"
-
-# ╔═╡ 0d16a700-58ee-450f-b1ff-ddc4b7e147b3
-md"##### Implementación SVD"
+# ╔═╡ 5ca21bcf-04a8-49b4-9650-e98812d10473
+md"Del cuaderno `svd_ingenuo.jl`:"
 
 # ╔═╡ 01501b00-dbf5-46a6-963c-aef4fd675545
 md"Con dos subfunciones: `QRPivotado_` y `RealSchur`"
@@ -300,16 +258,6 @@ end
 
 # ╔═╡ 5e862bcc-a235-4c5e-81a7-fc73bd04a06a
 begin
-	function RealSchur(A, iteraciones = 10000)
-		H0 = A
-		H1, Q = HessenbergForm(A)
-		δ = 10
-		for _ = 1:iteraciones
-			H0 = H1
-			H1,Q = HessenbergQR(H1,Q)
-		end
-		return H1, Q
-	end
 	function Housev(x)
 	    n = length(x)
 	    v = ones(size(x))
@@ -385,15 +333,18 @@ begin
 		
 		return H2,Q
 	end
-end
 
-# ╔═╡ 61e867fa-a908-4cc7-beeb-90d276b9c897
-struct SVDReconstruction
-    U::Matrix{Float64}
-    S::Vector{Float64}
-    V::Matrix{Float64}
+		function RealSchur(A, iteraciones = 10000)
+		H0 = A
+		H1, Q = HessenbergForm(A)
+		δ = 10
+		for _ = 1:iteraciones
+			H0 = H1
+			H1,Q = HessenbergQR(H1,Q)
+		end
+		return H1, Q
+	end
 end
-
 
 # ╔═╡ b649cd99-5310-4ba5-99fe-bd9c4583c54c
 function naiveSVD_classic_(A::Matrix{Float64})
@@ -416,8 +367,60 @@ function naiveSVD_classic_(A::Matrix{Float64})
 	return SVDReconstruction(U, σ, V)
 end
 
-# ╔═╡ 219e47ad-96ad-4be7-965b-30c209c5903f
-md"##### SVD inpainting"
+# ╔═╡ 8558ba84-507e-4034-99fe-432afdc12087
+md"
+### In-painting por SVD con SoftImpute
+Tenemos dos funciones de inpainting por svd, la única diferencia es que `svd_inpainting` usa el método `svd` y que `svd_inpainting_manual` usa el método `naiveSVD_classic_`.
+"
+
+# ╔═╡ 29532b55-58b2-46ac-86c6-eda0bbf6c813
+"""
+Realiza el completado de matrices dañadas con el algoritmo SoftImpute.
+"""
+function svd_inpainting(X::AbstractMatrix, mask::AbstractMatrix;
+                     λ::Float64 = 1.0,
+                     max_rank::Int = typemax(Int),
+                     max_iter::Int = 100,
+                     tol::Float64 = 1e-4)
+
+    m, n = size(X)
+    @assert size(mask) == size(X) "La máscara debe tener el mismo tamaño que la matriz X"
+
+    Z = zeros(m, n)
+    X_filled = copy(Z)
+
+    for iter in 1:max_iter
+        # Step 1: Reemplaza entradas observadas con datos originales y el resto con Z
+        for i in 1:m, j in 1:n
+            X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
+        end
+
+        # Step 2: Descomposición SVD
+        U, S, Vt = svd(X_filled)
+
+        # Step 3: Umbralización suave (soft-thresholding)
+        S_thresholded = max.(S .- λ, 0.0)
+        k = min(count(x -> x > 0.0, S_thresholded), max_rank)
+
+        # Step 4: Reconstrucción truncada
+        Z_new = U[:, 1:k] * Diagonal(S_thresholded[1:k]) * Vt[:, 1:k]'
+
+        # Step 5: Criterio de parada
+        diff = norm(Z_new - Z) / max(norm(Z), 1e-8)
+
+        Z = Z_new
+        if diff < tol
+            println("Convergió en la iteración $iter con error relativo $diff")
+            break
+        end
+    end
+
+	for i in 1:m, j in 1:n
+		X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
+	end
+    return X_filled
+end
+
 
 # ╔═╡ 443289ce-22fc-46d7-a93f-9e6fe097cfc5
 """
@@ -669,8 +672,9 @@ Se utilizó **ChatGPT (OpenAI)** de forma activa para:
 ---
 
 ### Fuentes externas consultadas:
-
+* Código del cuaderno `svd_ingenuo.jl`
 * Marangoz, S. (2023). *Image Imputation with SVD*. [https://salihmarangoz.github.io/blog/Image-Imputation-with-SVD](https://salihmarangoz.github.io/blog/Image-Imputation-with-SVD)
+* Mazumder, R., Hastie, T. and Tibshirani, R. (2010) ‘Spectral Regularization Algorithms for Learning Large Incomplete Matrices.’
 * Golub, G., & Van Loan, C. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.
 
 """
@@ -2585,22 +2589,22 @@ version = "1.9.2+0"
 # ╟─2812ab89-9954-412c-935e-5281ed29e7b8
 # ╟─8c798beb-8a08-426a-bd07-dd124b2add09
 # ╠═890a2834-49b6-4351-b3d9-f124e809322d
+# ╠═61e867fa-a908-4cc7-beeb-90d276b9c897
 # ╟─6c71642a-b1e0-4866-b304-aec85e4d71f1
 # ╟─dfa2de65-b023-4c75-99bd-e714861ad46f
-# ╠═8558ba84-507e-4034-99fe-432afdc12087
-# ╠═5df8a1a5-ad79-4efa-b8da-af9967da6631
-# ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
-# ╠═c3df9380-c344-4434-ba11-5f46bbc22a3a
-# ╟─bf1d46b6-2d5f-451c-83ac-cdbe062f245c
-# ╟─0d16a700-58ee-450f-b1ff-ddc4b7e147b3
-# ╟─b649cd99-5310-4ba5-99fe-bd9c4583c54c
+# ╟─d546204d-3ba2-4483-b6c9-1eb1bdb0ec30
+# ╟─2b8d70a8-6ae9-47c2-bf6f-01cbd402cb47
+# ╠═a195f049-fd18-48da-91f1-79784acf7fc2
+# ╟─5ca21bcf-04a8-49b4-9650-e98812d10473
+# ╠═b649cd99-5310-4ba5-99fe-bd9c4583c54c
 # ╟─01501b00-dbf5-46a6-963c-aef4fd675545
-# ╟─99b6345c-0033-48ce-9fbe-50a75bc47fc2
-# ╟─5e862bcc-a235-4c5e-81a7-fc73bd04a06a
-# ╟─61e867fa-a908-4cc7-beeb-90d276b9c897
-# ╟─219e47ad-96ad-4be7-965b-30c209c5903f
+# ╠═99b6345c-0033-48ce-9fbe-50a75bc47fc2
+# ╠═5e862bcc-a235-4c5e-81a7-fc73bd04a06a
+# ╟─8558ba84-507e-4034-99fe-432afdc12087
+# ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
 # ╠═443289ce-22fc-46d7-a93f-9e6fe097cfc5
 # ╟─20b98000-d061-4f7b-a9aa-da4fb421cf59
+# ╠═c3df9380-c344-4434-ba11-5f46bbc22a3a
 # ╟─b62bad5f-174d-4a44-8dda-776333954109
 # ╠═6cfccb92-ccb7-49de-92bc-e1ae971b68db
 # ╠═7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
