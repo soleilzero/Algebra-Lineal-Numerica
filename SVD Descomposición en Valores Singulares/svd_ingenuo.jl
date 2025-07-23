@@ -71,23 +71,10 @@ Se utilizó **ChatGPT (OpenAI)** de forma activa para la generación y refactori
 md"## Teoría"
 
 # ╔═╡ 8c4925b3-70c8-4d63-9140-1ba1a541f14d
-md"## Implementación del método ingenuo"
+md"## Implementación"
 
-# ╔═╡ 36cc1bce-5264-4f14-8e79-ab83320e083d
-md"
-De acuerdo con el libro el pseudocódigo es el siguiente:
-1. Form $C=A^TA$
-2. Use the symmetric QR algorithm to compute $V^TCV=diag(o²)$
-3. Apply QR with column pivoting to $AV$ to obtain $U^T (AV)N =R$
-"
-
-# ╔═╡ eccf8824-6d32-491d-9391-9b60e20b14f2
-begin
-	A=rand(5,5)
-	C=A'*A
-	display(A)
-	epsilon=1E-10
-end
+# ╔═╡ 4c28ca44-c61b-4db4-87e1-eb00fb467246
+md"### Set up"
 
 # ╔═╡ 11f75b56-81b0-4ea8-9689-4721e2c29a34
 struct SVDReconstruction
@@ -97,96 +84,11 @@ struct SVDReconstruction
 end
 
 
-# ╔═╡ 88697440-08ac-4748-8224-863ede4a8a22
-function relative_frobenius_error(A, Â)
-    return norm(A - Â, Fro) / norm(A, Fro)
-end
-
-
-# ╔═╡ f479bb41-5a99-424c-9aab-121ef5b6b51e
-"""
-Reconstruye la matriz original A a partir de su descomposición SVD.
-Recibe un objeto F retornado por la función svd(A).
-Devuelve A ≈ U * Σ * Vᵀ
-"""
-function reconstruct_from_svd(F; V_transposed=false)
-    n = size(F.S, 1)
-    Σ = zeros(n, n)
-    for i in 1:length(F.S)
-        Σ[i, i] = F.S[i]
-    end
-	if V_transposed
-    	return F.U * Σ * F.V
-	else
-		return F.U * Σ * F.V'
-	end
-end
-
-# ╔═╡ c4c38a38-9298-4cda-998e-03f4610cd33a
-"""
-Valida una descomposición SVD comparando la matriz original A
-con su reconstrucción desde la tupla o estructura SVD `F`.
-
-Imprime la norma del error ‖A - UΣVᵀ‖₂.
-"""
-function validate_svd(A::Matrix{Float64}, F; V_transposed=false)
-    A_hat = reconstruct_from_svd(F;V_transposed=V_transposed)
-    error = norm(A - A_hat)
-	display(A_hat)
-    println("Error de reconstrucción ‖A - UΣVᵀ‖₂ = ", error)
-	#println("Error de Frobenius ‖A - UΣVᵀ‖₂ = ", relative_frobenius_error(A,A_hat))
-
-    return error
-end
-
-
-# ╔═╡ bccf578b-da57-4df2-b5cb-cf5a95c80ff4
-md"Hay un error en la validación del SVD. Funciona mejor con el V_transposed contrario. Igualmente los errores son grandes.
-Idea: usar error contra svd normal
-"
-
-# ╔═╡ 33b3d729-7315-4c60-9854-48d9a246cd32
-s1=svd(A)
-
-# ╔═╡ b3b5bc5b-c93d-4f92-9d89-33165587bf1e
-md"
-Para el método `svd` de Julia:
-el error de reconstrucción teniendo en cuenta que V es no transpuesta corresponde al error de máquina.
-"
-
-# ╔═╡ 578c849f-0760-41a6-b6f2-0a225afddeb8
-validate_svd(A, s1) #sirve
-
-# ╔═╡ 318ce551-45b6-4d04-ba66-4d622051807d
-md"
-Para el método `svd_via_ata` en el cual implementados el algoritmo SVD con el algoritmo QR de Julia, el error es de más de una unidad incluso si se tiene en cuenta que V no está transpuesta.
-"
-
-# ╔═╡ fa7fafbc-04d3-4c69-9aad-4ee86fcffba6
-md"
-Para el método `naiveSVD_classic_` en el cual implementados el algoritmo SVD con el algoritmo QR dado en clase, el error es de aproximadamente $5*10^{-1}$ incluso si se tiene en cuenta que V no está transpuesta.
-"
-
-# ╔═╡ a0236861-049d-40c3-9069-70029c13bc69
-md"Para V_transposed=true ninguna sirve..."
-
-# ╔═╡ 8c02d86c-9479-4df8-a94f-8489406a5356
-validate_svd(A, s1; V_transposed=true) #no sirve
-
-# ╔═╡ b460bc19-8641-47ba-89e6-06faf66f53ac
-md"Y para matrices grandes, toma bastante tiempo"
-
 # ╔═╡ 41c1603c-6101-4bee-b66a-3f88dacce14d
 md"### SVD de Julia"
 
 # ╔═╡ a4858212-5dd0-406a-ac48-314dbb539517
 svd
-
-# ╔═╡ 7618b8dc-1f91-40a3-9ea3-a8248b9efe28
-begin
-	A1 = svd(A)
-	validate_svd(A,A1)
-end
 
 # ╔═╡ 7066f320-5339-40db-bdda-1e1c396e6fc1
 md"### SVD usando un QR de Julia"
@@ -223,59 +125,36 @@ function svd_via_ata(A::Matrix{Float64})
     return SVDReconstruction(U, σ, V)
 end
 
-# ╔═╡ df587928-e939-4d20-a959-eb4128980bed
-s2=svd_via_ata(A)
-
-# ╔═╡ 210b22b9-13e6-4d29-a1f4-6d0e85bf45a6
-validate_svd(A, s2)
-
-# ╔═╡ 83cb9d8a-b759-473e-9d2e-52b6fb5f2054
-validate_svd(A, s2; V_transposed=true)
-
-# ╔═╡ 59e48f61-049f-4708-a474-293c289f4539
-begin
-	F2 = svd_via_ata(A)
-	validate_svd(A,F2)
-end
-
 # ╔═╡ d0cfe9c6-04ba-47af-b466-3763cbae0364
 md"
-### Usando un QR propio
+### Método ingenuo
+
+De acuerdo con el libro el pseudocódigo es el siguiente:
+1. Form $C=A^TA$
+2. Use the symmetric QR algorithm to compute $V^TCV=diag(o²)$
+3. Apply QR with column pivoting to $AV$ to obtain $U^T (AV)N =R$
 "
 
 # ╔═╡ 921e6808-b9e7-493f-8042-6f8e5419a117
-md"#### Paso 2: Descomposición de Schur"
-
-# ╔═╡ aae50fe4-6d55-4e6e-803c-1dde61f1947f
-md"Utilizamos la descomposición de Schur para obtener los autovalores y los autovectores ($V$) de $C$, veamos que funciona en un ejemplo:"
-
-# ╔═╡ 9e7998ae-f91b-424b-bca8-05fcd71064ec
 md"
+#### Paso 2: Obtención de autovalores y autovectores
+Para obtener los autovalores y los autovectores ($V$) de $C$ utilizamos la descomposición de Schur. Utilizaremos una adaptación del método `RealSchur` del cuaderno `SchurFinal.jl`.
+
+La adaptación es para guardar también `Q` en `HessenbergQR` y `RealSchur`.
+
+Ahora, comparemos el método propio de Julia `eigen` con la función `RealSchur` para autovalores y autovectores.
+
 **Autovalores:**
-
-Comparemos 3 métodos diferentes para obtener los autovalores: el de Julia, El del notebook `RealSchur` y el adaptado `RealSchur_` para devolver también $V$.
-
-Podemos ver que el original `RealSchur` es mucho más preciso que el adaptado
 "
 
-# ╔═╡ ce85b232-ec3d-4d1c-84d5-420f9911ac24
-sort(eigen(Symmetric(C)).values, rev=true)
+# ╔═╡ 29ede2b0-76b4-4d4c-be37-cd74dc285ec9
+md"**Autovectores:**"
 
-# ╔═╡ e8606e61-cbaf-4062-8c4f-abb653737919
+# ╔═╡ 70737453-1dd3-4832-8dcc-02924df3ee48
 md"
-**Autovectores**
-
-Ahora comparemos dos métodos para obtener autovectores: el método propio de Julia con `RealSchur_`. Podemos ver que los resultados no son cercanos
+Podemos ver que ambos métodos coinciden.
+Ahora veamos el código de `Real_Schur`, junto con las funciones auxiliares `HessenbergForm` y `HessenbergQR` que transforman la matriz en una matriz Hessenberg y luego aplican la descomposición QR.
 "
-
-# ╔═╡ b88b2e64-6c79-461c-a89e-ee816bd4a2ba
-eigen(Symmetric(C)).vectors
-
-# ╔═╡ 1e0bd262-f985-44c9-8e4f-136fc43b6390
-md"**HessenbergQR**"
-
-# ╔═╡ e2df08c4-245e-48d8-b680-539d9b12adda
-md"Ahora veamos el código:"
 
 # ╔═╡ b32ef216-4e64-44aa-9e84-1bedbccabac3
 begin
@@ -313,6 +192,32 @@ begin
 	    end
 	    return v, β
 	end
+end
+
+# ╔═╡ a66ef3b2-602e-4bf6-801f-b44e6af58404
+begin
+	function HessenbergQR(H,Q)
+		n = size(H)[1]
+		H2 = copy(H)
+		C, S = zeros(n-1), zeros(n-1)
+		
+		# Factorización QR de H
+		# Q^T*H o Givens por la izquierda
+		for k = 1:n-1
+			C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
+			H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
+			H2[k+1,k] = 0
+			Q[:, k:k+1] = Q[:, k:k+1] * [C[k] S[k]; -S[k] C[k]]  # actualizar Q
+		end
+		
+		# Matriz RQ
+		# H*Q o Givens por la derecha
+		for k = 1:n-1
+			H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
+		end
+		
+		return H2,Q
+	end
 	
 	begin
 		function Givens(a,b)
@@ -335,36 +240,6 @@ begin
 	end
 end
 
-# ╔═╡ a66ef3b2-602e-4bf6-801f-b44e6af58404
-function HessenbergQR(H,Q)
-	n = size(H)[1]
-	H2 = copy(H)
-	C, S = zeros(n-1), zeros(n-1)
-	
-	# Factorización QR de H
-	# Q^T*H o Givens por la izquierda
-	for k = 1:n-1
-		C[k], S[k] = Givens(H2[k,k], H2[k+1, k])
-		H2[k:k+1,k:n] = [C[k] -S[k]; S[k] C[k]]*H2[k:k+1,k:n]
-		H2[k+1,k] = 0
-		Q[:, k:k+1] = Q[:, k:k+1] * [C[k] S[k]; -S[k] C[k]]  # actualizar Q
-	end
-	
-	# Matriz RQ
-	# H*Q o Givens por la derecha
-	for k = 1:n-1
-		H2[1:k+1, k:k+1] = H2[1:k+1, k:k+1]*[C[k] S[k]; -S[k] C[k]]
-	end
-	
-	return H2,Q
-end
-
-# ╔═╡ af05a8ab-8a80-49c3-b5c9-78a80d257490
-begin
-	H, Q = HessenbergForm(A)
-	HessenbergQR(H,Q)
-end
-
 # ╔═╡ f2647a91-cb20-4740-97ef-dcb6efc38e88
 function RealSchur(A, iteraciones = 10000)
     H0 = A
@@ -378,40 +253,11 @@ function RealSchur(A, iteraciones = 10000)
     
 end
 
-# ╔═╡ e16a2c37-32fa-4476-a6c2-69889d532e16
-Diagonal(RealSchur(C)[1])
-
-# ╔═╡ 240d8bff-c900-4126-b906-3d7d7b9d0e56
-RealSchur(C)[2]
-
 # ╔═╡ 17ff8c7b-b0aa-4490-8d53-20eb82e9764d
-md"### Paso 3: Apply QR with column pivoting to $AV$ to obtain $U^T (AV)N =R$ "
-
-# ╔═╡ ce61ed2c-354e-461b-b654-aaf02202fc7e
-md"### Final"
-
-# ╔═╡ 79b9956c-b3b5-4747-b919-dd4b9fc604bb
 md"
-**To Do:**
-
-utilizar ortogonalización e iteración QR propio (en classroom - matrices simétricas)
-dos formas: con A_TA y la otra, por bloques 2x2 con primer bloque siendo [0 A // A^T 0]
-en ambas calcular los valores propios de la matriz
-- Reemplazar `eigenvalues` por qr propio
-- Reemplazar `Q, _ = qr(AV)` por qr propio
-
-Opción 1: modificar Schur para que devuelva los vectores
-Opción 2: armar V de la otra forma
+#### Paso 3: Obtener $U$
+Aplicamos el algoritmo QR con pivoteo de columna a $AV$ para obtener $U^T (AV)N =R$.
 "
-
-# ╔═╡ 491e85bc-2104-4908-8797-194c89cf1f7f
-md"
-### Versión nueva
-Queremos un Real Schur que devuelva también Q, la única diferencia con el original es que HessenberQR también debe devolver Q.
-"
-
-# ╔═╡ f2a6c197-13a8-468e-bb43-61f6010bdae3
-md"#### Ahora...."
 
 # ╔═╡ de232181-3366-4949-a7a4-6dabbcc10cc2
 function QRPivotado_(A::Matrix{Float64})
@@ -442,34 +288,124 @@ end
 
 # ╔═╡ ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
 function naiveSVD_classic_(A::Matrix{Float64})
+	#Paso 1
 	C = transpose(A) * A
+	
+	#Paso 2
 	T, V = RealSchur(C)
 	λ = diag(T)
 	σ = sqrt.(abs.(λ))
+
+	#Reorden
 	orden = sortperm(σ, rev=true)
 	σ = σ[orden]
 	V = V[:, orden]
+
+	#Paso 3
 	AV = A * V
 	U, _, _ = QRPivotado_(AV)
 	return SVDReconstruction(U, σ, V)
 end
 
-# ╔═╡ 6f6f3e46-7164-4200-88fb-3a437543986f
-s3=naiveSVD_classic_(A)
+# ╔═╡ b69f8c42-91a2-4b99-b180-b6481c30a6c6
+md"### Evaluación
+#### Funciones de evaluación
+"
 
-# ╔═╡ c80c0ecf-1b44-445f-a990-d044e4d4280c
-validate_svd(A, s3) #sirve más o menos
+# ╔═╡ ba01fa78-0585-4deb-924b-1b815a9e32c0
+"""
+Reconstruye la matriz original A a partir de su descomposición SVD.
+Recibe un objeto F retornado por la función svd(A).
+Devuelve A ≈ U * Σ * Vᵀ
+"""
+function reconstruct_from_svd(F; V_transposed=false)
+    n = size(F.S, 1)
+    Σ = zeros(n, n)
+    for i in 1:length(F.S)
+        Σ[i, i] = F.S[i]
+    end
+	if V_transposed
+    	return F.U * Σ * F.V
+	else
+		return F.U * Σ * F.V'
+	end
+end
 
-# ╔═╡ 5e2753e3-bb12-442c-992e-0ac11a147f57
-validate_svd(A, s3; V_transposed=true)
+# ╔═╡ adfcb17d-2de1-4581-9495-fed1359d8a1f
+"""
+Valida una descomposición SVD comparando la matriz original A
+con su reconstrucción desde la tupla o estructura SVD `F`.
+
+Imprime la norma del error ‖A - UΣVᵀ‖₂.
+"""
+function validate_svd(A::Matrix{Float64}, F; V_transposed=false)
+    A_hat = reconstruct_from_svd(F;V_transposed=V_transposed)
+    error = norm(A - A_hat)
+	display(A_hat)
+    println("Error de reconstrucción ‖A - UΣVᵀ‖₂ = ", error)
+
+    return error
+end
+
+# ╔═╡ de203fde-bd13-4b46-a0cb-8af4407ef83f
+md"
+### Ejemplos
+Veamos el error de reconstrucción para cada método. Podemos ver que para `svd` y para `naiveSVD_classic_` el error corresponde al error de máquina, lo cual es un buen signo.
+"
+
+# ╔═╡ ecf2900a-b0f7-4a65-bc20-0b0671ef30ad
+begin
+	A=rand(5,5)
+	C=A'*A
+	display(A)
+end
+
+# ╔═╡ 59e48f61-049f-4708-a474-293c289f4539
+begin
+	F2 = svd_via_ata(A)
+	validate_svd(A,F2)
+end
+
+# ╔═╡ ce85b232-ec3d-4d1c-84d5-420f9911ac24
+sort(eigen(C).values, rev=true)
+
+# ╔═╡ e16a2c37-32fa-4476-a6c2-69889d532e16
+Diagonal(RealSchur(C)[1])
+
+# ╔═╡ b88b2e64-6c79-461c-a89e-ee816bd4a2ba
+eigen(Symmetric(C)).vectors
+
+# ╔═╡ 240d8bff-c900-4126-b906-3d7d7b9d0e56
+RealSchur(C)[2]
+
+# ╔═╡ 4806679c-71bf-431a-9464-93689e696a35
+begin
+	s1=svd(A)
+	validate_svd(A, s1)
+end
+
+# ╔═╡ cb6b4738-a3c5-413a-9a28-108af85fb249
+begin
+	s2=svd_via_ata(A)
+	validate_svd(A, s2)
+end
+
+# ╔═╡ 3abe59da-bf9d-4703-b584-d378dcbec887
+begin
+	s3=naiveSVD_classic_(A)
+	validate_svd(A, s3)
+end
+
+# ╔═╡ 60d6c2cb-56c5-47b9-9959-7caf72d214e5
+md"Y para matrices grandes, toma bastante tiempo"
 
 # ╔═╡ 82d13c2a-f64d-447a-9b4b-371f2d3d50c2
 begin
 	D=rand(500,500)
-	s5=naiveSVD_classic_(D)
+	#s5=naiveSVD_classic_(D)
 end
 
-# ╔═╡ e7a42900-4c04-4baa-94b6-a0a2254f5177
+# ╔═╡ d1b359b3-bf0e-47a2-893e-6de182767fc0
 svd(D)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -518,60 +454,41 @@ version = "5.11.0+0"
 # ╔═╡ Cell order:
 # ╟─9c09483c-6619-11f0-339c-3132d4ffd563
 # ╟─71039e0e-48ff-4953-b400-ce22494ff56a
-# ╟─b250760b-efa2-46df-a1e4-656547a6d3d9
 # ╟─69ad41a3-b775-4168-a3c7-218d45eaa0d5
 # ╟─8c4925b3-70c8-4d63-9140-1ba1a541f14d
-# ╟─36cc1bce-5264-4f14-8e79-ab83320e083d
+# ╟─4c28ca44-c61b-4db4-87e1-eb00fb467246
 # ╠═bf0426ff-6f2c-4bb7-b3bb-0017d99e81c7
-# ╠═eccf8824-6d32-491d-9391-9b60e20b14f2
 # ╠═11f75b56-81b0-4ea8-9689-4721e2c29a34
-# ╠═88697440-08ac-4748-8224-863ede4a8a22
-# ╠═f479bb41-5a99-424c-9aab-121ef5b6b51e
-# ╠═c4c38a38-9298-4cda-998e-03f4610cd33a
-# ╟─bccf578b-da57-4df2-b5cb-cf5a95c80ff4
-# ╠═33b3d729-7315-4c60-9854-48d9a246cd32
-# ╠═df587928-e939-4d20-a959-eb4128980bed
-# ╠═6f6f3e46-7164-4200-88fb-3a437543986f
-# ╟─b3b5bc5b-c93d-4f92-9d89-33165587bf1e
-# ╠═578c849f-0760-41a6-b6f2-0a225afddeb8
-# ╟─318ce551-45b6-4d04-ba66-4d622051807d
-# ╠═210b22b9-13e6-4d29-a1f4-6d0e85bf45a6
-# ╠═fa7fafbc-04d3-4c69-9aad-4ee86fcffba6
-# ╠═c80c0ecf-1b44-445f-a990-d044e4d4280c
-# ╟─a0236861-049d-40c3-9069-70029c13bc69
-# ╠═8c02d86c-9479-4df8-a94f-8489406a5356
-# ╠═83cb9d8a-b759-473e-9d2e-52b6fb5f2054
-# ╠═5e2753e3-bb12-442c-992e-0ac11a147f57
-# ╟─b460bc19-8641-47ba-89e6-06faf66f53ac
-# ╠═e7a42900-4c04-4baa-94b6-a0a2254f5177
-# ╠═82d13c2a-f64d-447a-9b4b-371f2d3d50c2
 # ╟─41c1603c-6101-4bee-b66a-3f88dacce14d
 # ╠═a4858212-5dd0-406a-ac48-314dbb539517
-# ╠═7618b8dc-1f91-40a3-9ea3-a8248b9efe28
 # ╟─7066f320-5339-40db-bdda-1e1c396e6fc1
 # ╠═293b240e-fd3b-48e4-ba3c-d5e337fd4d2f
 # ╠═59e48f61-049f-4708-a474-293c289f4539
 # ╟─d0cfe9c6-04ba-47af-b466-3763cbae0364
+# ╠═ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
 # ╟─921e6808-b9e7-493f-8042-6f8e5419a117
-# ╟─aae50fe4-6d55-4e6e-803c-1dde61f1947f
-# ╟─9e7998ae-f91b-424b-bca8-05fcd71064ec
 # ╠═ce85b232-ec3d-4d1c-84d5-420f9911ac24
 # ╠═e16a2c37-32fa-4476-a6c2-69889d532e16
-# ╟─e8606e61-cbaf-4062-8c4f-abb653737919
+# ╟─29ede2b0-76b4-4d4c-be37-cd74dc285ec9
 # ╠═b88b2e64-6c79-461c-a89e-ee816bd4a2ba
 # ╠═240d8bff-c900-4126-b906-3d7d7b9d0e56
-# ╟─1e0bd262-f985-44c9-8e4f-136fc43b6390
-# ╠═af05a8ab-8a80-49c3-b5c9-78a80d257490
-# ╠═a66ef3b2-602e-4bf6-801f-b44e6af58404
-# ╟─e2df08c4-245e-48d8-b680-539d9b12adda
+# ╟─70737453-1dd3-4832-8dcc-02924df3ee48
 # ╠═f2647a91-cb20-4740-97ef-dcb6efc38e88
 # ╠═b32ef216-4e64-44aa-9e84-1bedbccabac3
+# ╠═a66ef3b2-602e-4bf6-801f-b44e6af58404
 # ╟─17ff8c7b-b0aa-4490-8d53-20eb82e9764d
-# ╟─ce61ed2c-354e-461b-b654-aaf02202fc7e
-# ╟─79b9956c-b3b5-4747-b919-dd4b9fc604bb
-# ╟─491e85bc-2104-4908-8797-194c89cf1f7f
-# ╟─f2a6c197-13a8-468e-bb43-61f6010bdae3
 # ╠═de232181-3366-4949-a7a4-6dabbcc10cc2
-# ╠═ef1c9edb-f3e8-4972-8d8a-8cefa57dd544
+# ╠═b69f8c42-91a2-4b99-b180-b6481c30a6c6
+# ╠═ba01fa78-0585-4deb-924b-1b815a9e32c0
+# ╠═adfcb17d-2de1-4581-9495-fed1359d8a1f
+# ╟─de203fde-bd13-4b46-a0cb-8af4407ef83f
+# ╠═ecf2900a-b0f7-4a65-bc20-0b0671ef30ad
+# ╠═4806679c-71bf-431a-9464-93689e696a35
+# ╠═cb6b4738-a3c5-413a-9a28-108af85fb249
+# ╠═3abe59da-bf9d-4703-b584-d378dcbec887
+# ╠═60d6c2cb-56c5-47b9-9959-7caf72d214e5
+# ╠═d1b359b3-bf0e-47a2-893e-6de182767fc0
+# ╠═82d13c2a-f64d-447a-9b4b-371f2d3d50c2
+# ╟─b250760b-efa2-46df-a1e4-656547a6d3d9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
