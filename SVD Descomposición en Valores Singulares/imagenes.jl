@@ -471,37 +471,17 @@ function svd_inpainting_manual(X::AbstractMatrix, mask::AbstractMatrix;
 end
 
 
-# ╔═╡ 20b98000-d061-4f7b-a9aa-da4fb421cf59
-md"
-## Ejemplos
-### Con funciones propias
-"
-
-# ╔═╡ b62bad5f-174d-4a44-8dda-776333954109
-md"Primero, ejecutemos las funciones y veamos que cada iteración toma apróximadamente un minuto (lo cual es un número gigante).
-Por esto, vamos a limitarnos a 3 iteraciones por el momento."
-
-# ╔═╡ c51040ec-b5ed-4ba7-aff2-60713c292606
-md"Ahora, a modo de control, veamos el algoritmo utilizando el svd de julia. A izquierda con 10 iteraciones y a derecha con solo 3."
-
-# ╔═╡ 2cf3d5df-7ee5-45e2-bb13-65be38fa9d34
-md"Seguido a esto, ejecutemos el código propio y comparemos en diferentes casos:
-* a izquierda, 3 iteraciones sobre la imagen sin inicializar,
-* en el medio, 3 iteraciones sobre la imagen ya inicializada
-* y a la derecha, la imagen inicializada sin pasarla por un algoritmo de inpainting.
-
-Podemos ver que en la primera, los grandes huecos blancos no se alcanzan a terminar bien. Es por esto que la segunda imagen que trabaja sobre una ya inicializada, funciona mejor, pero al compararla con la imagen de inicialización podemos ver que también es gracias a nuestro algoritmo de inpainting.
-"
-
 # ╔═╡ 1f0f90c2-f71b-4fde-b223-22d101ff44c9
 md"
-### Con algoritmos propios
+## Ejemplos
 A continuación veremos dos ejemplos de imágenes, la primera ha sido dañada artificialmente y la segunda ha tenido daño real.
 
 En las gráficas podremos ver, en orden:
-* la imagen original
-* la máscara utilizada
-* un posible resultado.
+* la imagen original,
+* la máscara utilizada,
+* el resultado de `svd_inpainting`.
+
+Estas gráficas permiten explicar intuitivamente el objetivo del algoritmo.
 "
 
 # ╔═╡ 96af3132-6566-4cb7-a210-3d019467550d
@@ -529,23 +509,6 @@ begin
 	ncol=3
 )
 end
-
-# ╔═╡ c3df9380-c344-4434-ba11-5f46bbc22a3a
-Z_hat = svd_inpainting(matrix_ex2, mask_ex2; λ=0.5, max_rank=5, max_iter=200)
-
-# ╔═╡ 6cfccb92-ccb7-49de-92bc-e1ae971b68db
-matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2; max_iter=1)
-
-# ╔═╡ 7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
-Gray.(svd_inpainting(matrix5, mask_ex2))
-
-# ╔═╡ ca125213-f2b3-4be1-8217-745c206b907d
-mosaicview(
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=1)), 
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=10)),
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2)); 
-	ncol=3
-)
 
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
@@ -585,6 +548,18 @@ function show_reconstructions(recs; ncol=2)
     mosaicview(imgs...; ncol=ncol)
 end
 
+
+# ╔═╡ ca125213-f2b3-4be1-8217-745c206b907d
+begin
+	md"Ahora, a modo de control, veamos el algoritmo utilizando el svd de julia. A izquierda con 10 iteraciones y a derecha con solo 3."
+	
+	mosaicview(
+		Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=1)), 
+		Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=10)),
+		Gray.(svd_inpainting(matrix_ex2, mask_ex2)); 
+		ncol=3
+	)
+end
 
 # ╔═╡ 120da197-8913-460e-86f7-24e51ad30edc
 md"### Comparación de inicializaciones para diferentes valores de k"
@@ -2603,20 +2578,13 @@ version = "1.9.2+0"
 # ╟─8558ba84-507e-4034-99fe-432afdc12087
 # ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
 # ╠═443289ce-22fc-46d7-a93f-9e6fe097cfc5
-# ╟─20b98000-d061-4f7b-a9aa-da4fb421cf59
-# ╠═c3df9380-c344-4434-ba11-5f46bbc22a3a
-# ╟─b62bad5f-174d-4a44-8dda-776333954109
-# ╠═6cfccb92-ccb7-49de-92bc-e1ae971b68db
-# ╠═7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
-# ╟─c51040ec-b5ed-4ba7-aff2-60713c292606
-# ╠═ca125213-f2b3-4be1-8217-745c206b907d
-# ╟─2cf3d5df-7ee5-45e2-bb13-65be38fa9d34
-# ╠═1f0f90c2-f71b-4fde-b223-22d101ff44c9
+# ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
-# ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
+# ╠═72177df0-5329-4f71-88ce-25f6427aa8b8
 # ╠═18428c85-668c-45e4-ad6d-0e0d43b94be7
 # ╠═83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
+# ╠═ca125213-f2b3-4be1-8217-745c206b907d
 # ╟─120da197-8913-460e-86f7-24e51ad30edc
 # ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 # ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
