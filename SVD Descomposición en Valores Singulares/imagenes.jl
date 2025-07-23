@@ -198,61 +198,6 @@ function generate_mask(img, threshold=0.95)
 end
 
 
-# ╔═╡ aa48a83d-6310-4713-9f9c-43644265bafd
-md"
-#### Inicialización
-Podemos inicializar los valores faltantes de cada matriz a un valor promedio de su fila o columna, esto permite dar un mejor punto de partida al algoritmo
-"
-
-# ╔═╡ c67b15c5-2115-4233-8f61-a55a9d3ae411
-"""
-Rellena los valores faltantes de `A_obs` usando una estimación inicial.
-
-Argumentos:
-- `A_obs`: Matriz de la imagen observada.
-- `M`: Máscara de observación (1 conocido, 0 faltante).
-- `method`: `"row"`, `"col"` o `"global"`.
-
-Retorna la matriz inicializada.
-"""
-function initialize_missing(A_obs, M; method="row")
-    A_init = copy(A_obs)
-
-    if method == "row"
-        for i in 1:size(A_obs, 1)
-            known = findall(M[i, :] .== 1.0)
-            mean_val = isempty(known) ? 0.0 : mean(A_obs[i, known])
-            for j in 1:size(A_obs, 2)
-                if M[i,j] == 0.0
-                    A_init[i,j] = mean_val
-                end
-            end
-        end
-
-    elseif method == "col"
-        for j in 1:size(A_obs, 2)
-            known = findall(M[:, j] .== 1.0)
-            mean_val = isempty(known) ? 0.0 : mean(A_obs[known, j])
-            for i in 1:size(A_obs, 1)
-                if M[i,j] == 0.0
-                    A_init[i,j] = mean_val
-                end
-            end
-        end
-
-    elseif method == "global"
-        known_vals = A_obs[M .== 1.0]
-        mean_val = isempty(known_vals) ? 0.0 : mean(known_vals)
-        A_init[M .== 0.0] .= mean_val
-
-    else
-        error("Método no reconocido. Usa 'row', 'col' o 'global'.")
-    end
-
-    return A_init
-end
-
-
 # ╔═╡ 8558ba84-507e-4034-99fe-432afdc12087
 md"
 ### Aplicar algoritmo de in-painting por SVD
@@ -560,7 +505,6 @@ En las gráficas podremos ver, en orden:
 begin
 	matrix_ex1 = Float64.(Gray.(load("imagen_ejemplo.png")))
 	mask_ex1 = generate_mask(matrix_ex1, .95)
-	init_ex1 = initialize_missing(matrix_ex1, mask_ex1; method="global");
 	
 	mosaicview(
 		Gray.(matrix_ex1), 
@@ -574,7 +518,6 @@ end
 begin
 	matrix_ex2 = Float64.(Gray.(load("imagen_ejemplo_6.jpeg")))
 	mask_ex2 = generate_mask(matrix_ex2, .6)
-	init_ex2 = initialize_missing(matrix_ex2, mask_ex2; method="global");
 	
 	mosaicview(
 	Gray.(matrix_ex2), 
@@ -592,20 +535,6 @@ matrix5=svd_inpainting_manual(matrix_ex2, mask_ex2; max_iter=1)
 
 # ╔═╡ 7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
 Gray.(svd_inpainting(matrix5, mask_ex2))
-
-# ╔═╡ 04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
-begin
-	init_ex5 = initialize_missing(matrix_ex2, mask_ex2; method="global");
-	matrix6 = svd_inpainting_manual(init_ex5, mask_ex2, 10, 1)
-end
-
-# ╔═╡ 08838687-83a8-4a94-8420-973b17645834
-mosaicview(
-	Gray.(matrix5),
-	Gray.(matrix6),
-	Gray.(init_ex5); 
-	ncol=3
-)
 
 # ╔═╡ ca125213-f2b3-4be1-8217-745c206b907d
 mosaicview(
@@ -657,63 +586,6 @@ end
 # ╔═╡ 120da197-8913-460e-86f7-24e51ad30edc
 md"### Comparación de inicializaciones para diferentes valores de k"
 
-# ╔═╡ f9739f4e-71cf-47b0-b193-bce281c5fee8
-"""
-Genera distintas inicializaciones para los valores faltantes de `A`.
-
-Retorna un diccionario con las inicializaciones: `:row`, `:col`, `:global`, `:no_init`
-"""
-function generate_initializations(A, mask)
-    return Dict(
-        :no_init => A,
-        :row => initialize_missing(A, mask; method="row"),
-        :col => initialize_missing(A, mask; method="col"),
-        :global => initialize_missing(A, mask; method="global")
-    )
-end
-
-
-# ╔═╡ a322892a-a789-4679-8639-a13b35884522
-"""
-Ejecuta todo el proceso de comparación.
-"""
-function compare_initilizations(A, mask; k=50, max_iter=10, ncol=4, verbose=false)
-    inits = generate_initializations(A, mask)
-    recs = reconstruct_all(inits, mask; k=k, max_iter=max_iter)
-	if verbose
-		println("Orden de las imágenes: ", collect(keys(recs)))
-	end
-	show_reconstructions(recs, ncol=ncol)
-end
-
-
-# ╔═╡ 702f99ea-3c58-4782-98dd-6dceddbf767c
-md"Para $k=5$:"
-
-# ╔═╡ 1bc17a9d-3252-4e6f-a373-b8457f209c99
-compare_initilizations(matrix_ex1, mask_ex1; k=5, verbose=true)
-
-# ╔═╡ e17d5daf-2b19-4824-8040-7647e0d84477
-compare_initilizations(matrix_ex2, mask_ex2; k=5)
-
-# ╔═╡ b47f5bd3-bcd9-402a-8369-2ca651e3b666
-md"Para $k=30$:"
-
-# ╔═╡ 647fdaa6-0fb8-4aee-af48-2b6254a04552
-compare_initilizations(matrix_ex1, mask_ex1; k=30)
-
-# ╔═╡ ba546705-6e36-4498-8a75-a0135d0f0187
-compare_initilizations(matrix_ex2, mask_ex2; k=30)
-
-# ╔═╡ 460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
-md"
-**Resultado:**
-
-Para $k=5$, en ambas imágenes la inicialización o no inicialización de la imagen no genera cambios remarcables.
-
-Para $k=30$, los huecos tienden al color de base, por lo que la imagen no inicializada es más claramente erronea. Sin embargo no se ven diferencias mayores entre los 3 métodos de inicialización, por lo que solo vamos a utilizar el global de ahora en adelante.
-"
-
 # ╔═╡ 6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 md"
 ### Diferentes valores de $λ$
@@ -727,21 +599,21 @@ Veremos si se cumple que:
 * Un $k$ grande preserva detalles finos, pero también amplifica errores si el daño es severo.
 "
 
-# ╔═╡ fe9f245b-0c84-45ef-94da-bfc29e5c7b32
+# ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
 mosaicview(
-	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=.1)),
-	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=.5)),
-	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=1.0)),
-	Gray.(svd_inpainting(init_ex1, mask_ex1; λ=2.0));
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.1)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.5)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=1.0)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=2.0));
 	ncol = 4
 )
 
-# ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
+# ╔═╡ 1bc77a28-e7c7-4bd5-82f4-c71582bd476c
 mosaicview(
-	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=.1)),
-	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=.5)),
-	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=1.0)),
-	Gray.(svd_inpainting(init_ex2, mask_ex2; λ=2.0));
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.1)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.5)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=1.0)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=2.0));
 	ncol = 4
 )
 
@@ -763,6 +635,9 @@ El principal aprendizaje que me dejó este notebook fue el de cambiar de enfoque
 Trabajar de forma modular y avanzar en otras partes del proyecto mientras maduro una idea resultó ser una estrategia muy útil.
 
 El proyecto me permitió ver la importancia de la matriz SVD al ver cómo captura globalmente la información de una matriz. Además pude aplicar de forma práctica el teorema de las aproximaciones óptimas del SVD.
+
+## Trabajo futuro
+Modificar el algoritmo `Soft-Impute` para implementar diferentes inicializaciones de la matriz `Z`, como es trabajado en Marangoz, S. (2023).
 "
 
 # ╔═╡ 8dd2bede-9731-4b8f-86a5-41d44e9d57af
@@ -2712,8 +2587,6 @@ version = "1.9.2+0"
 # ╠═890a2834-49b6-4351-b3d9-f124e809322d
 # ╟─6c71642a-b1e0-4866-b304-aec85e4d71f1
 # ╟─dfa2de65-b023-4c75-99bd-e714861ad46f
-# ╟─aa48a83d-6310-4713-9f9c-43644265bafd
-# ╟─c67b15c5-2115-4233-8f61-a55a9d3ae411
 # ╠═8558ba84-507e-4034-99fe-432afdc12087
 # ╠═5df8a1a5-ad79-4efa-b8da-af9967da6631
 # ╠═29532b55-58b2-46ac-86c6-eda0bbf6c813
@@ -2731,30 +2604,19 @@ version = "1.9.2+0"
 # ╟─b62bad5f-174d-4a44-8dda-776333954109
 # ╠═6cfccb92-ccb7-49de-92bc-e1ae971b68db
 # ╠═7403d9f7-0ac4-47d5-abe3-ba2fccc477cd
-# ╠═04c86eb8-ff60-4d1d-8ca3-ac4f25be8422
 # ╟─c51040ec-b5ed-4ba7-aff2-60713c292606
 # ╠═ca125213-f2b3-4be1-8217-745c206b907d
 # ╟─2cf3d5df-7ee5-45e2-bb13-65be38fa9d34
-# ╠═08838687-83a8-4a94-8420-973b17645834
 # ╠═1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
 # ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
 # ╠═18428c85-668c-45e4-ad6d-0e0d43b94be7
-# ╟─83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
+# ╠═83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
 # ╟─120da197-8913-460e-86f7-24e51ad30edc
-# ╟─f9739f4e-71cf-47b0-b193-bce281c5fee8
-# ╠═a322892a-a789-4679-8639-a13b35884522
-# ╟─702f99ea-3c58-4782-98dd-6dceddbf767c
-# ╠═1bc17a9d-3252-4e6f-a373-b8457f209c99
-# ╠═e17d5daf-2b19-4824-8040-7647e0d84477
-# ╟─b47f5bd3-bcd9-402a-8369-2ca651e3b666
-# ╠═647fdaa6-0fb8-4aee-af48-2b6254a04552
-# ╠═ba546705-6e36-4498-8a75-a0135d0f0187
-# ╟─460383c1-9bf4-4f1e-9bf8-2fb5b88d16b6
-# ╠═6683a374-9ab6-41de-9be2-deb7ba4a1f3d
-# ╠═fe9f245b-0c84-45ef-94da-bfc29e5c7b32
+# ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 # ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
+# ╠═1bc77a28-e7c7-4bd5-82f4-c71582bd476c
 # ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
 # ╟─297878d6-f1b2-4073-be73-a6030c9bc294
 # ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
