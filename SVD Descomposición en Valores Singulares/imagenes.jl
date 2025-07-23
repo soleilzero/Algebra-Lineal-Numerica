@@ -474,26 +474,52 @@ end
 # ╔═╡ 219e47ad-96ad-4be7-965b-30c209c5903f
 md"##### SVD inpainting"
 
-# ╔═╡ 3c11aae2-81c9-47bf-aca2-78567afc4972
-function svd_inpainting_manual(A_obs::Matrix{Float64}, M::Matrix{Float64}, k::Int=50, max_iter::Int=30)
-    # Inicializamos la matriz de reconstrucción con los datos observados
-    A_rec = copy(A_obs)
+# ╔═╡ 443289ce-22fc-46d7-a93f-9e6fe097cfc5
+"""
+Realiza el completado de matrices dañadas con el algoritmo SoftImpute utilizando una implementación propia del svd
+"""
+function svd_inpainting_manual(X::AbstractMatrix, mask::AbstractMatrix;
+                     λ::Float64 = 1.0,
+                     max_rank::Int = typemax(Int),
+                     max_iter::Int = 100,
+                     tol::Float64 = 1e-4)
+
+    m, n = size(X)
+    @assert size(mask) == size(X) "La máscara debe tener el mismo tamaño que la matriz X"
+
+    Z = zeros(m, n)
+    X_filled = copy(Z)
 
     for iter in 1:max_iter
-        # Descomposición SVD de la imagen actual
-        svd = naiveSVD_classic_(A_rec)
+        # Step 1: Reemplaza entradas observadas con datos originales y el resto con Z
+        for i in 1:m, j in 1:n
+            X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
+        end
 
-        # Truncamos los valores singulares a rango k
-        S_trunc = Diagonal(vcat(svd.S[1:k], zeros(length(svd.S) - k)))
+        # Step 2: Descomposición SVD
+        U, S, Vt = naiveSVD_classic_(X_filled)
 
-        # Reconstruimos la versión de rango bajo
-        A_lowrank = svd.U * S_trunc * svd.V'
+        # Step 3: Umbralización suave (soft-thresholding)
+        S_thresholded = max.(S .- λ, 0.0)
+        k = min(count(x -> x > 0.0, S_thresholded), max_rank)
 
-        # Actualizamos: mantenemos los píxeles conocidos y sustituimos los faltantes
-        A_rec = M .* A_obs + (1 .- M) .* A_lowrank
+        # Step 4: Reconstrucción truncada
+        Z_new = U[:, 1:k] * Diagonal(S_thresholded[1:k]) * Vt[:, 1:k]'
+
+        # Step 5: Criterio de parada
+        diff = norm(Z_new - Z) / max(norm(Z), 1e-8)
+
+        Z = Z_new
+        if diff < tol
+            println("Convergió en la iteración $iter con error relativo $diff")
+            break
+        end
     end
 
-    return A_rec
+	for i in 1:m, j in 1:n
+		X_filled[i, j] = Bool(mask[i, j]) ? X[i, j] : Z[i, j]
+	end
+    return X_filled
 end
 
 
@@ -785,9 +811,6 @@ Se utilizó **ChatGPT (OpenAI)** de forma activa para:
 * Golub, G., & Van Loan, C. (2013). *Matrix Computations* (4th ed.). Johns Hopkins University Press.
 
 """
-
-# ╔═╡ 3c643907-b46a-4100-80ee-06de6cd12770
-
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2718,7 +2741,7 @@ version = "1.9.2+0"
 # ╟─5e862bcc-a235-4c5e-81a7-fc73bd04a06a
 # ╟─61e867fa-a908-4cc7-beeb-90d276b9c897
 # ╟─219e47ad-96ad-4be7-965b-30c209c5903f
-# ╠═3c11aae2-81c9-47bf-aca2-78567afc4972
+# ╠═443289ce-22fc-46d7-a93f-9e6fe097cfc5
 # ╠═20b98000-d061-4f7b-a9aa-da4fb421cf59
 # ╠═b62bad5f-174d-4a44-8dda-776333954109
 # ╠═6cfccb92-ccb7-49de-92bc-e1ae971b68db
@@ -2750,6 +2773,5 @@ version = "1.9.2+0"
 # ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
 # ╠═297878d6-f1b2-4073-be73-a6030c9bc294
 # ╠═8dd2bede-9731-4b8f-86a5-41d44e9d57af
-# ╠═3c643907-b46a-4100-80ee-06de6cd12770
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
