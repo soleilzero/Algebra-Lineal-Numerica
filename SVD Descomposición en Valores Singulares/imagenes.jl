@@ -510,11 +510,101 @@ begin
 )
 end
 
+# ╔═╡ 84c76a74-feb5-4404-b263-079f0b726847
+begin
+	matrix_ex3 = Float64.(Gray.(load("imagen_ejemplo_5.jpg")))
+	mask_ex3 = generate_mask(matrix_ex3, .7)
+	
+	mosaicview(
+		Gray.(matrix_ex3), 
+		Gray.(mask_ex3), 
+		Gray.(svd_inpainting(matrix_ex3, mask_ex3)); 
+		ncol=3
+	)
+end
+
+# ╔═╡ 33373c18-1325-41e8-bc6e-a8aa66fb3cc8
+md"
+Podemos ver que el funcionamiento correcto del algoritmo depende de la buena identificación de los valores faltantes (la máscara).
+
+Como en este caso identificamos la máscara seleccionando los pixeles más claros que un límite definido manualmente, tendremos un buen resultado con imagenes relativamente oscuras que tengan errores bastante iluminados. Este es el caso en `imagen_ejemplo.png` y `imagen_ejemplo_6.jpeg` pero menos en `imagen_ejemplo_5`.
+"
+
 # ╔═╡ 72177df0-5329-4f71-88ce-25f6427aa8b8
 md"
-## Experimentos y análisis
-Realicemos una comparación visual para diferentes valores en la restitución ($k$ y $max_iter$)
+## Experimentos y resultados
+Realicemos las siguientes comparaciones:
+* `svd_inpainting` vs `svd_inpainting_manual` en tiempo y en resultado,
+* variando $λ$ y
+* variando $max\_iter$.
 "
+
+# ╔═╡ d4fbc35c-7d63-4aef-a79f-82aad0b2b12d
+md"
+### `svd_inpainting` vs `svd_inpainting_manual`
+
+"
+
+# ╔═╡ a2568f2a-4ce2-4114-8f24-899b6f7e3e95
+mosaicview(
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2)),
+	Gray.(svd_inpainting_manual(matrix_ex2, mask_ex2));
+	n_col=2
+)
+
+# ╔═╡ 6683a374-9ab6-41de-9be2-deb7ba4a1f3d
+md"
+### Diferentes valores de $λ$
+
+Veremos si se cumple que:
+* Un $λ$ grande implica una imagen muy suavizada. Solo se preservan patrones globales y se pierde el detalle.
+
+* Un $λ$ intermedio reconstruye patrones generales y algo de textura.
+
+* Un $λ$ pequeño preserva detalles finos, pero también amplifica errores si el daño es severo.
+"
+
+# ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
+mosaicview(
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.1)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.5)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=1.0)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=2.0));
+	ncol = 4
+)
+
+# ╔═╡ 1bc77a28-e7c7-4bd5-82f4-c71582bd476c
+mosaicview(
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.1)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.5)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=1.0)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=2.0));
+	ncol = 4
+)
+
+# ╔═╡ 82c49113-628d-43b5-a54f-8ebfa66e8261
+md"
+**Resultado**
+
+En efecto, $k$ se balancea entre ser muy suave (siguiendo los patrones generales más fuertes) y estar sobreajustado.
+
+En la imagen dañada artificialmente, que tiene daños redondeados y grandes, el valor mediano de $k=30$.
+En la imagen real, que tiene daños largos y lineares, los valores menores de $k=5,10$ actuaron mejor.
+"
+
+# ╔═╡ f341bace-947c-41e8-8cd5-36a6d7b19250
+md"
+### Variando $max\_iter$
+Ahora, a modo de control, veamos el algoritmo utilizando el svd de julia. A izquierda con 10 iteraciones y a derecha con solo 3.
+"
+
+# ╔═╡ d74db7e4-2273-4851-b003-14f8b60419e8
+mosaicview(
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=1)), 
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=10)),
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2)); 
+	ncol=3
+)
 
 # ╔═╡ 18428c85-668c-45e4-ad6d-0e0d43b94be7
 """
@@ -548,62 +638,6 @@ function show_reconstructions(recs; ncol=2)
     mosaicview(imgs...; ncol=ncol)
 end
 
-
-# ╔═╡ ca125213-f2b3-4be1-8217-745c206b907d
-begin
-	md"Ahora, a modo de control, veamos el algoritmo utilizando el svd de julia. A izquierda con 10 iteraciones y a derecha con solo 3."
-	
-	mosaicview(
-		Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=1)), 
-		Gray.(svd_inpainting(matrix_ex2, mask_ex2; max_iter=10)),
-		Gray.(svd_inpainting(matrix_ex2, mask_ex2)); 
-		ncol=3
-	)
-end
-
-# ╔═╡ 120da197-8913-460e-86f7-24e51ad30edc
-md"### Comparación de inicializaciones para diferentes valores de k"
-
-# ╔═╡ 6683a374-9ab6-41de-9be2-deb7ba4a1f3d
-md"
-### Diferentes valores de $λ$
-Queremos un mosaico que muestre las imágenes con k=5,10,20,40 por e.g.
-
-Veremos si se cumple que:
-* Un $k$ pequeño implica una imagen muy suavizada. Solo se preservan patrones globales y se pierde el detalle.
-
-* Un $k$ intermedio reconstruye patrones generales y algo de textura.
-
-* Un $k$ grande preserva detalles finos, pero también amplifica errores si el daño es severo.
-"
-
-# ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
-mosaicview(
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.1)),
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.5)),
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=1.0)),
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=2.0));
-	ncol = 4
-)
-
-# ╔═╡ 1bc77a28-e7c7-4bd5-82f4-c71582bd476c
-mosaicview(
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.1)),
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.5)),
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=1.0)),
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=2.0));
-	ncol = 4
-)
-
-# ╔═╡ 82c49113-628d-43b5-a54f-8ebfa66e8261
-md"
-**Resultado**
-
-En efecto, $k$ se balancea entre ser muy suave (siguiendo los patrones generales más fuertes) y estar sobreajustado.
-
-En la imagen dañada artificialmente, que tiene daños redondeados y grandes, el valor mediano de $k=30$.
-En la imagen real, que tiene daños largos y lineares, los valores menores de $k=5,10$ actuaron mejor.
-"
 
 # ╔═╡ 297878d6-f1b2-4073-be73-a6030c9bc294
 md"
@@ -2566,7 +2600,7 @@ version = "1.9.2+0"
 # ╠═890a2834-49b6-4351-b3d9-f124e809322d
 # ╠═61e867fa-a908-4cc7-beeb-90d276b9c897
 # ╟─6c71642a-b1e0-4866-b304-aec85e4d71f1
-# ╟─dfa2de65-b023-4c75-99bd-e714861ad46f
+# ╠═dfa2de65-b023-4c75-99bd-e714861ad46f
 # ╟─d546204d-3ba2-4483-b6c9-1eb1bdb0ec30
 # ╟─2b8d70a8-6ae9-47c2-bf6f-01cbd402cb47
 # ╠═a195f049-fd18-48da-91f1-79784acf7fc2
@@ -2581,15 +2615,19 @@ version = "1.9.2+0"
 # ╟─1f0f90c2-f71b-4fde-b223-22d101ff44c9
 # ╠═96af3132-6566-4cb7-a210-3d019467550d
 # ╠═5b2ba4a0-448a-4300-a259-da1d02ac1bbd
-# ╠═72177df0-5329-4f71-88ce-25f6427aa8b8
-# ╠═18428c85-668c-45e4-ad6d-0e0d43b94be7
-# ╠═83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
-# ╠═ca125213-f2b3-4be1-8217-745c206b907d
-# ╟─120da197-8913-460e-86f7-24e51ad30edc
+# ╠═84c76a74-feb5-4404-b263-079f0b726847
+# ╟─33373c18-1325-41e8-bc6e-a8aa66fb3cc8
+# ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
+# ╟─d4fbc35c-7d63-4aef-a79f-82aad0b2b12d
+# ╠═a2568f2a-4ce2-4114-8f24-899b6f7e3e95
 # ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 # ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
 # ╠═1bc77a28-e7c7-4bd5-82f4-c71582bd476c
 # ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
+# ╟─f341bace-947c-41e8-8cd5-36a6d7b19250
+# ╠═d74db7e4-2273-4851-b003-14f8b60419e8
+# ╠═18428c85-668c-45e4-ad6d-0e0d43b94be7
+# ╠═83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
 # ╟─297878d6-f1b2-4073-be73-a6030c9bc294
 # ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
 # ╟─00000000-0000-0000-0000-000000000001
