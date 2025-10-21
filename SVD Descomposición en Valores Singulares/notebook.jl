@@ -9,7 +9,7 @@ using LinearAlgebra
 
 # ╔═╡ a58e9c22-51a1-11f0-0fc0-914efb421b18
 md"""
-# Cálculo Numérico de la SVD: Algoritmo de Golub–Kahan
+# Cálculo Numérico de la SVD
 
 ## Índice
 1. Objetivos
@@ -18,19 +18,25 @@ md"""
 3. Algoritmos
 """
 
-# ╔═╡ 11b2ebb7-626e-49c1-a294-c9b834c73bdb
+# ╔═╡ 85600d69-be3a-4a8c-a2a3-6cbcb726a9c3
 md"
 ## Objetivos
 
-Explicar y analizar detalladamente el algoritmo numérico para calcular la descomposición en valores singulares (SVD), con énfasis en el enfoque de Golub–Kahan basado en la reducción bidiagonal y la iteración QR implícita.
+**General**
 
+Comprender, implementar y analizar el algoritmo numérico ingenuo para calcular la descomposición en valores singulares (SVD).
+
+**Específicos**
 * Exponer las conexiones teóricas entre la SVD y los problemas de autovalores simétricos,
+* implementar el algoritmo utilizando los algoritmos QR de las notas de clase,
 * analizar el comportamiento numérico del algoritmo clásico frente a métodos mal condicionados,
-* implementar y visualizar los pasos clave del algoritmo de Golub–Kahan,
-* discutir la eficiencia computacional y estrategias prácticas.
+* discutir posibles estrategias prácticas.
 
 En otro trabajo se puede aplicar la SVD computada numéricamente a un problema práctico.
+"
 
+# ╔═╡ 11b2ebb7-626e-49c1-a294-c9b834c73bdb
+md"
 ## Introducción 
 
 La descomposición en valores singulares (SVD) es una de las herramientas más poderosas y versátiles del álgebra lineal numérica.
@@ -1169,6 +1175,11 @@ md"
 * - [ ] How to get the SVD from the result?
 - [ ] Add or transform into a `Bidiagonal` version (does it count as implicit?)
      -> Comparar con versión INGENUA, no clásica.
+
+
+utilizar ortogonalización y iteración QR propio (en classroom - matrices simétricas)
+
+dos formas: con $A_TA$ y la otra, por bloques $2x2$ con primer bloque siendo $[0 A // A^T 0]$ en ambas calcular los valores propios de la matriz
 "
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -1215,10 +1226,11 @@ version = "5.11.0+0"
 """
 
 # ╔═╡ Cell order:
-# ╟─a58e9c22-51a1-11f0-0fc0-914efb421b18
+# ╠═a58e9c22-51a1-11f0-0fc0-914efb421b18
 # ╠═701241c2-322f-45ca-b17d-437cf32a7ff3
-# ╟─11b2ebb7-626e-49c1-a294-c9b834c73bdb
-# ╟─6b68d0ac-8118-44aa-940e-5a807217e562
+# ╠═85600d69-be3a-4a8c-a2a3-6cbcb726a9c3
+# ╠═11b2ebb7-626e-49c1-a294-c9b834c73bdb
+# ╠═6b68d0ac-8118-44aa-940e-5a807217e562
 # ╟─56ef11c7-1b71-45f7-b286-38a932ac3dc4
 # ╟─dbb9e53d-bb68-4220-a32d-6c3ce32e274a
 # ╟─85c6df45-20ef-4db2-8703-ddf76166832e
@@ -1228,22 +1240,22 @@ version = "5.11.0+0"
 # ╟─a8f52599-0132-4cd7-b665-8d44fd8d2d52
 # ╟─4b7d264c-0790-40a9-bf34-f7d1e31fcc41
 # ╟─6cd89edb-e55f-46bf-b6b1-39b2453cdf1e
-# ╟─ea4159af-a82d-40b2-ace2-c689aaeecd0d
+# ╠═ea4159af-a82d-40b2-ace2-c689aaeecd0d
 # ╠═8b67358e-800f-4bf9-8869-90b29612e51e
 # ╠═beac433a-c1f4-4191-899f-6eb37d929889
 # ╠═8138c8bb-ca12-492c-9e78-f88c692f9538
 # ╟─aab73b0c-4d6e-467e-aaf8-93d8456508bc
 # ╟─bb27217f-4d64-4e47-946d-65a4590226ea
 # ╟─e2d4f475-165a-47dc-a4ab-1e9b1f97be3f
-# ╟─f2d58441-03af-4efb-9ad5-f3628511d7fa
-# ╟─c7b2ba31-3e8a-4c66-8583-d7817bf53e1b
+# ╠═f2d58441-03af-4efb-9ad5-f3628511d7fa
+# ╠═c7b2ba31-3e8a-4c66-8583-d7817bf53e1b
 # ╟─d804ab81-03bb-4770-a508-d58dc204de2b
 # ╟─b6b0df75-1ffa-44bb-9b74-518bb918e8ab
 # ╠═af80df53-340d-419d-aa6a-9bea98050ca7
 # ╠═5655e762-fc65-48da-a4d8-9bbf0cf5e3fc
 # ╟─59f9f7e8-f355-40a3-94e0-5cb3c6dec15d
-# ╟─40a0849e-6ad5-4b70-b708-5cb1d92ed578
-# ╟─6363a2cf-a7bf-475b-8f9c-0de2c5c66697
+# ╠═40a0849e-6ad5-4b70-b708-5cb1d92ed578
+# ╠═6363a2cf-a7bf-475b-8f9c-0de2c5c66697
 # ╟─08313203-f0ae-4603-be49-a85da9ffe178
 # ╟─247c0f32-0141-424f-9e8d-6dda19a521db
 # ╟─d5e98c9e-92ee-454d-9de8-7c5f38e89c68
@@ -1281,6 +1293,6 @@ version = "5.11.0+0"
 # ╟─277c10ee-bd03-4efe-b54b-0d835a8781a0
 # ╟─9a929fc1-a2b2-474a-9deb-4d8a6bc6d7d1
 # ╟─cb27deb4-cefa-4d34-b29f-be8fd219035d
-# ╠═00ca8f64-6937-45ee-8970-d1c2bf49fd59
+# ╟─00ca8f64-6937-45ee-8970-d1c2bf49fd59
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
