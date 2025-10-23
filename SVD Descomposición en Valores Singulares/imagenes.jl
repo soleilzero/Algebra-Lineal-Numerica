@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.20.3
+# v0.20.8
 
 using Markdown
 using InteractiveUtils
@@ -11,6 +11,7 @@ begin
 	using ImageIO
 	using Plots
 	using Statistics
+	using BenchmarkTools
 end
 
 # ╔═╡ cc79ca6a-6232-11f0-0def-2166b5607fa9
@@ -542,15 +543,45 @@ Realicemos las siguientes comparaciones:
 # ╔═╡ d4fbc35c-7d63-4aef-a79f-82aad0b2b12d
 md"
 ### `svd_inpainting` vs `svd_inpainting_manual`
-
+En tiempo y memoria:
 "
+
+# ╔═╡ 9122d74d-9a63-4a26-952e-81fce8443382
+@benchmark(svd_inpainting(matrix_ex2, mask_ex2; tol = 1.0))
+
+# ╔═╡ e2166c59-cd83-4707-8ce1-3f0aa9a00532
+@benchmark(svd_inpainting_manual(matrix_ex2, mask_ex2; tol = 1.0))
+
+# ╔═╡ 89067226-5dba-4c48-a30f-8d935e9d30f4
+md"En resultado:"
+
+# ╔═╡ 9de7f1ea-5379-4f30-a989-5681937e421f
+matrix_julia = svd_inpainting(matrix_ex2, mask_ex2; tol = 1e-2)
+
+# ╔═╡ f681f5cc-1a74-4eba-a99a-d165c237441c
+matrix_manual = svd_inpainting_manual(matrix_ex2, mask_ex2; tol = 1e-2)
 
 # ╔═╡ a2568f2a-4ce2-4114-8f24-899b6f7e3e95
 mosaicview(
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2)),
-	Gray.(svd_inpainting_manual(matrix_ex2, mask_ex2));
-	n_col=2
+	Gray.(matrix_julia),
+	Gray.(matrix_manual),
+	ncol=2
 )
+
+# ╔═╡ 590bf8d9-b94c-4f92-92e2-7d330c238916
+begin
+	abs_diff = norm(matrix_manual - matrix_julia)
+	rel_diff = norm(matrix_manual - matrix_julia) / norm(matrix_julia)
+
+	println("Diferencia entre métodos:")
+	println("Absoluta: " * string(abs_diff))
+	println("Relativa: " * string(rel_diff))
+end
+
+# ╔═╡ 4050818b-eb18-4f95-a57a-ce7918c65224
+md"
+Podemos ver que aunque el resultado de ambos métodos es muy parecido tanto numéricamente como visualmente, la gran diferencia entre los métodos se encuentra en los recursos que necesitan tanto en tiempo(215ms vs 140s) como en memoria(49MiB vs 363GiB).
+"
 
 # ╔═╡ 6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 md"
@@ -566,30 +597,25 @@ Veremos si se cumple que:
 
 # ╔═╡ ab3d50fc-245f-40d7-a860-c2df236b74e5
 mosaicview(
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.1)),
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.5)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=.2)),
 	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=1.0)),
-	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=2.0));
-	ncol = 4
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; λ=5.0));
+	ncol = 3
 )
 
 # ╔═╡ 1bc77a28-e7c7-4bd5-82f4-c71582bd476c
 mosaicview(
 	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.1)),
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=.5)),
 	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=1.0)),
-	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=2.0));
-	ncol = 4
+	Gray.(svd_inpainting(matrix_ex2, mask_ex2; λ=5.0));
+	ncol = 3
 )
 
 # ╔═╡ 82c49113-628d-43b5-a54f-8ebfa66e8261
 md"
 **Resultado**
 
-En efecto, $k$ se balancea entre ser muy suave (siguiendo los patrones generales más fuertes) y estar sobreajustado.
-
-En la imagen dañada artificialmente, que tiene daños redondeados y grandes, el valor mediano de $k=30$.
-En la imagen real, que tiene daños largos y lineares, los valores menores de $k=5,10$ actuaron mejor.
+En efecto, $λ$ nos permite balancear entre que los pixeles reemplazados estén sobreajustados o que sean muy generales o suaves.
 "
 
 # ╔═╡ f341bace-947c-41e8-8cd5-36a6d7b19250
@@ -597,6 +623,14 @@ md"
 ### Variando $max\_iter$
 Ahora, a modo de control, veamos el algoritmo utilizando el svd de julia. A izquierda con 10 iteraciones y a derecha con solo 3.
 "
+
+# ╔═╡ 22040cbf-24f8-453f-ada7-e3aa53bbb476
+mosaicview(
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; max_iter=1)), 
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1; max_iter=10)),
+	Gray.(svd_inpainting(matrix_ex1, mask_ex1)); 
+	ncol=3
+)
 
 # ╔═╡ d74db7e4-2273-4851-b003-14f8b60419e8
 mosaicview(
@@ -606,38 +640,12 @@ mosaicview(
 	ncol=3
 )
 
-# ╔═╡ 18428c85-668c-45e4-ad6d-0e0d43b94be7
-"""
-Aplica SVD inpainting a cada inicialización.
+# ╔═╡ 73622c53-66ab-4f0f-8968-897c906b79dc
+md"
+**Resultado**
 
-Argumentos:
-- `initializations`: Diccionario de matrices inicializadas.
-- `mask`: Máscara binaria.
-
-Retorna un diccionario de reconstrucciones.
-"""
-function reconstruct_all(initializations, mask; k=50, max_iter=30)
-    recs = Dict()
-    for (key, A_init) in initializations
-        recs[key] = svd_inpainting(A_init, mask)
-    end
-    return recs
-end
-
-
-# ╔═╡ 83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
-"""
-Muestra las reconstrucciones en un `mosaicview` en formato 2x2.
-
-Argumentos: 
-- `recs`: Diccionario de imágenes reconstruidas.
-- `ncol`: Número de columnas en el mosaico
-"""
-function show_reconstructions(recs; ncol=2)
-    imgs = [Gray.(recs[key]) for key in keys(recs)]
-    mosaicview(imgs...; ncol=ncol)
-end
-
+Podemos ver que entre mayor número de iteraciones, los detalles de la imagen son más precisos y no uniformes.
+"
 
 # ╔═╡ 297878d6-f1b2-4073-be73-a6030c9bc294
 md"
@@ -691,6 +699,7 @@ Se utilizó **ChatGPT (OpenAI)** de forma activa para:
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 ImageIO = "82e4d734-157c-48bb-816b-45c225c6df19"
 Images = "916415d5-f1e6-5110-898d-aaa5f9f070e0"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -698,19 +707,19 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [compat]
+BenchmarkTools = "~1.6.0"
 ImageIO = "~0.6.9"
 Images = "~0.26.2"
 Plots = "~1.40.17"
-Statistics = "~1.11.1"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.11.1"
+julia_version = "1.11.5"
 manifest_format = "2.0"
-project_hash = "157dcf914f24bc22fd0ad609976634bdf9e47433"
+project_hash = "e9e38b1cf54cccad1e3e16091f317b6786b037a5"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -801,6 +810,12 @@ version = "0.4.7"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 version = "1.11.0"
+
+[[deps.BenchmarkTools]]
+deps = ["Compat", "JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "e38fbc49a620f5d0b660d7f543db1009fe0f8336"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.6.0"
 
 [[deps.BitFlags]]
 git-tree-sha1 = "0691e34b3bb8be9307330f88d1a3c3f25466c24d"
@@ -1744,7 +1759,7 @@ version = "2.5.4+0"
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+2"
+version = "0.8.5+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -1896,6 +1911,10 @@ version = "1.4.3"
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+version = "1.11.0"
+
+[[deps.Profile]]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 version = "1.11.0"
 
 [[deps.ProgressMeter]]
@@ -2619,15 +2638,22 @@ version = "1.9.2+0"
 # ╟─33373c18-1325-41e8-bc6e-a8aa66fb3cc8
 # ╟─72177df0-5329-4f71-88ce-25f6427aa8b8
 # ╟─d4fbc35c-7d63-4aef-a79f-82aad0b2b12d
+# ╠═9122d74d-9a63-4a26-952e-81fce8443382
+# ╠═e2166c59-cd83-4707-8ce1-3f0aa9a00532
+# ╟─89067226-5dba-4c48-a30f-8d935e9d30f4
+# ╠═9de7f1ea-5379-4f30-a989-5681937e421f
+# ╠═f681f5cc-1a74-4eba-a99a-d165c237441c
 # ╠═a2568f2a-4ce2-4114-8f24-899b6f7e3e95
+# ╠═590bf8d9-b94c-4f92-92e2-7d330c238916
+# ╟─4050818b-eb18-4f95-a57a-ce7918c65224
 # ╟─6683a374-9ab6-41de-9be2-deb7ba4a1f3d
 # ╠═ab3d50fc-245f-40d7-a860-c2df236b74e5
 # ╠═1bc77a28-e7c7-4bd5-82f4-c71582bd476c
 # ╟─82c49113-628d-43b5-a54f-8ebfa66e8261
 # ╟─f341bace-947c-41e8-8cd5-36a6d7b19250
+# ╠═22040cbf-24f8-453f-ada7-e3aa53bbb476
 # ╠═d74db7e4-2273-4851-b003-14f8b60419e8
-# ╠═18428c85-668c-45e4-ad6d-0e0d43b94be7
-# ╠═83816a5c-b8c2-4aa0-9fa5-44a0f985fafd
+# ╟─73622c53-66ab-4f0f-8968-897c906b79dc
 # ╟─297878d6-f1b2-4073-be73-a6030c9bc294
 # ╟─8dd2bede-9731-4b8f-86a5-41d44e9d57af
 # ╟─00000000-0000-0000-0000-000000000001
